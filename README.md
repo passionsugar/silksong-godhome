@@ -1,8 +1,8 @@
 # 织忆圣所 · The Loom of Recollection
 
-《空洞骑士：丝之歌》的 Boss 重温 / 万神殿连战模组（BepInEx 5 插件）。非官方粉丝作品，与 Team Cherry 无关。
+**简体中文** | [English](README.en.md)
 
-A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx 5 plugin). Unofficial fan work, not affiliated with Team Cherry. English notes are further down.
+《空洞骑士：丝之歌》的 Boss 重温 / 万神殿连战模组（BepInEx 5 插件）。非官方粉丝作品，与 Team Cherry 无关。
 
 ## 能做什么
 
@@ -13,7 +13,7 @@ A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx
 
 ## 安装
 
-下载 Releases 里的压缩包，照里面的 `README.txt` 装。需要：
+下载 [Releases](https://github.com/passionsugar/silksong-godhome/releases) 里的压缩包，照里面的 `README.txt` 装。需要：
 
 - 正版《空洞骑士：丝之歌》（测试用的版本 1.0.30000）
 - BepInEx 5（`silksong_modding-BepInExPack_Silksong` 1.0.3）
@@ -34,19 +34,6 @@ A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx
 - `docs/hk1-port.md`、`docs/hk1-godhome-research.md`：前作神居的移植
 - `docs/boss-inventory.md`、`data/bosses.json`：Boss 清单和场地数据
 
-## English
+## 许可
 
-- **Separate save**: main menu → pick an empty slot → choose "The Loom of Recollection" in the play mode menu. Every ability, tool and crest from the start. Your normal saves are not touched; the mod only changes things inside this save.
-- **Boss revisits**: 50 boss fights, entered through a dream gate, back at the statue afterwards; three difficulty tiers.
-- **Pantheons**: five pantheons, four bindings (needle, masks, silk, tools), rest stops and a results screen. The fifth unlocks after the first four.
-- **Hollow Knight's Godhome (optional)**: if *Hollow Knight* is installed on the same PC, the lobby, the workshop, the pantheon doors, the rest-stop spa and the pantheon transitions come from the original Godhome scenes, read at runtime from your own copy of the game. Nothing from either game is included here. Without it, the mod builds its own sanctum from Silksong's assets.
-
-Requirements: *Hollow Knight: Silksong* (tested on 1.0.30000), BepInExPack_Silksong 1.0.3, DataManager 1.2.2 and I18N 1.1.1 by silksong_modding. For the optional Godhome: UnitySceneRepacker 0.3.0 by jakobhellermann and *Hollow Knight* itself (Steam installs are found automatically; otherwise set `Experimental.Hk1GameDir`).
-
-Build: .NET SDK (developed and tested with 10.0; the project uses the latest C# version, so older SDKs may fail), `dotnet build src/Godhome/Godhome.csproj -c Release`. Most of the documentation is in Chinese.
-
-## 许可 / License
-
-MIT，见 `LICENSE`。《空洞骑士》《空洞骑士：丝之歌》和它们的素材归 Team Cherry 所有；本仓库和安装包不含任何游戏文件。
-
-MIT, see `LICENSE`. *Hollow Knight*, *Hollow Knight: Silksong* and their assets belong to Team Cherry; this repository and the release archives contain no game files.
+MIT，见 [`LICENSE`](LICENSE)。《空洞骑士》《空洞骑士：丝之歌》和它们的素材归 Team Cherry 所有；本仓库和安装包不含任何游戏文件。
