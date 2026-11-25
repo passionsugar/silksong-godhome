@@ -1,0 +1,83 @@
+织忆圣所 The Loom of Recollection {VERSION}
+《空洞骑士：丝之歌》的 Boss 重温 / 连战模组（BepInEx 5 插件）。非官方粉丝作品。
+源码和问题反馈：https://github.com/passionsugar/silksong-godhome
+
+【需要】
+- 正版《空洞骑士：丝之歌》（测试用的游戏版本 1.0.30000）
+- BepInEx 5（BepInExPack_Silksong 1.0.3；测试用 BepInEx 5.4.23）
+- 两个前置插件（silksong_modding 出的，Thunderstore 上有）：
+  - DataManager 1.2.2
+  - I18N 1.1.1
+
+【可选：前作神居】
+同一台电脑装了《空洞骑士》（前作）时，神居存档的大厅、手办屋、万神殿的门、休息点的温泉、连战转场直接用前作神居的场景。要再装：
+- jakobhellermann 的 UnitySceneRepacker 0.3.0（Thunderstore 上有）
+- 《空洞骑士》本体。Steam 版会自动找到；装在别处的，在 BepInEx\config\local.silksong.godhome.cfg 的 Experimental 一段里把 Hk1GameDir 填成前作的游戏目录。
+前作的场景在运行时从你本机的游戏文件里读取。没装前作或者不想用，就用丝之歌素材搭的圣所（配置里 Hk1Godhome = false）。
+
+【安装】
+把压缩包里的 BepInEx 文件夹合并到游戏目录（和 Hollow Knight Silksong.exe 同一层）。
+装好以后是：BepInEx\plugins\Godhome\Godhome.dll（旁边有 data、languages 两个文件夹）。
+用 r2modman 等管理器的：先装好上面的前置，再把 BepInEx\plugins\Godhome 整个文件夹放进那个配置的 BepInEx\plugins。
+
+【开始玩】
+主菜单 → 选一个空的存档槽 → “选择模式”里选「织忆圣所」。
+这是单独的神居存档：一开始就有全部能力、工具和纹章，重温每一位 Boss、挑战万神殿。普通存档不受影响。
+用丝之歌素材的圣所里按 F6 打开织忆名录（按键可在配置文件里改）；前作神居里照前作走到雕像、门前按上。
+第五个万神殿要先通关前四个才开。
+
+【卸载】
+删掉 BepInEx\plugins\Godhome 文件夹。神居存档还在原来的存档槽里，不要了可以在游戏里删掉。
+
+【说明】
+- 压缩包里不含任何游戏文件。
+- 调试功能默认关闭，不用管配置文件里 [Debug] 那一段。
+- 还没手动实测的：几位 Boss 的入场点离 Boss 很近（进场时可能马上被撞到）；寡妇要按特殊挑战才开打。
+- 出问题时请在上面的 GitHub 地址提 issue，附上 BepInEx\LogOutput.log。
+
+----------------------------------------------------------------------
+
+The Loom of Recollection {VERSION}
+A boss-rush / boss-revisit mod for Hollow Knight: Silksong (BepInEx 5 plugin). Unofficial fan work.
+Source and issues: https://github.com/passionsugar/silksong-godhome
+
+Requirements
+- Hollow Knight: Silksong (tested on game version 1.0.30000)
+- BepInEx 5 (BepInExPack_Silksong 1.0.3; tested with BepInEx 5.4.23)
+- Two dependency plugins by silksong_modding (on Thunderstore):
+  - DataManager 1.2.2
+  - I18N 1.1.1
+
+Optional: Hollow Knight's Godhome
+If Hollow Knight is installed on the same PC, the lobby, workshop, pantheon doors, rest-stop spa and
+pantheon transitions come from the original Godhome scenes. You also need:
+- UnitySceneRepacker 0.3.0 by jakobhellermann (on Thunderstore)
+- Hollow Knight itself. Steam installs are found automatically; otherwise set Hk1GameDir in the
+  Experimental section of BepInEx\config\local.silksong.godhome.cfg to the game folder.
+The scenes are read at runtime from your own copy of the game. Without it (or with Hk1Godhome = false)
+the mod builds its own sanctum from Silksong's assets.
+
+Install
+Merge the BepInEx folder from this archive into the game folder (next to Hollow Knight Silksong.exe).
+You should end up with BepInEx\plugins\Godhome\Godhome.dll (plus the data and languages folders).
+With r2modman or another manager: install the dependencies first, then copy the whole
+BepInEx\plugins\Godhome folder into that profile's BepInEx\plugins.
+
+Play
+Main menu → pick an empty save slot → choose "The Loom of Recollection" in the play mode menu.
+It is a separate save: every ability, tool and crest from the start; revisit each boss and take on
+the pantheons. Your normal saves are not touched.
+In the Silksong-built sanctum press F6 to open the list (change it in the config file); in Hollow
+Knight's Godhome walk up to a statue or door and press up, as in the original.
+The fifth pantheon unlocks after clearing the first four.
+
+Uninstall
+Delete BepInEx\plugins\Godhome. The save stays in its slot; delete it in game if you no longer want it.
+
+Notes
+- The archive contains no game files.
+- Debug features are off by default; ignore the [Debug] section of the config file.
+- Not yet checked by hand: for a few bosses the entry point is very close to the boss; Widow needs
+  the special challenge to start.
+- If something goes wrong, please open an issue at the GitHub address above and attach
+  BepInEx\LogOutput.log.

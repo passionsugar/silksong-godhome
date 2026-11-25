@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+  Imports silksong path properties only if present in order to allow CI builds. The file should be gitignored.
+  If you are checking out from git and need to create a new one, you can use `dotnet new silksongpath` to generate one.
+  -->
+  <Import Condition="Exists('SilksongPath.props')" Project="SilksongPath.props" />
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <AnalysisMode>recommended</AnalysisMode>
+    <!-- Ignore warning about processor architecture mismatch with PlayMaker ConditionalExpression -->
+    <!-- [Godhome] CA1707/CA1852/CA1031 等风格类告警对 Harmony 补丁和 Unity 代码不适用，关掉 -->
+    <NoWarn>$(NoWarn);MSB3270;CA1707;CA1031;CA1852;CA1305;CA1307;CA1310;CA1311;CA1304;CA1822;CA1812;CA1859;CA1860;CA2201;IDE0051;IDE0060;UNT0006</NoWarn>
+
+    <!-- Shortens and anonymizes paths in debug symbols relative to the project directory. Breakpoints will not work, however. -->
+    <PathMap Condition="'$(Configuration)' == 'Release'">$(MSBuildProjectDirectory)=/</PathMap>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/passionsugar/silksong-godhome</RepositoryUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Analyzers" Version="1.0.8" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.Core" Version="5.4.21" />
+    <PackageReference Include="HarmonyX" Version="2.9.0" />
+    <PackageReference Include="Harmonize" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Hamunii.BepInEx.AutoPlugin" Version="2.0.1" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.25.0" PrivateAssets="all" />
+    <PackageReference Include="UnityEngine.Modules" Version="6000.0.50" IncludeAssets="compile" />
+    <PackageReference Include="Silksong.GameLibs" Version="1.2.0-silksong1.0.30000" PrivateAssets="all" />
+    <!-- [Godhome] 按存档槽保存模式进度。运行时需要把 DataManager 和它依赖的 I18N 单独装进 BepInEx\plugins（见 scripts\install-deps.ps1）。 -->
+    <PackageReference Include="Silksong.DataManager" Version="1.2.2" PrivateAssets="all" />
+    <!-- [Godhome] 试验：把前作（空洞骑士）的场景重新打包后在丝之歌里加载。只编译时引用；运行时要单独装 UnitySceneRepacker 插件。 -->
+    <PackageReference Include="Silksong.UnitySceneRepacker" Version="0.3.0" ExcludeAssets="runtime" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Remove="thunderstore/temp;thunderstore/dist" />
+    <None Include="README.md" Pack="True" PackagePath="README.md" />
+    <None Include="thunderstore/icon.png" Pack="True" PackagePath="icon.png" />
+  </ItemGroup>
+
+  <Target Name="CopyAndPackageMod" AfterTargets="PostBuildEvent">
+    <ItemGroup>
+      <Binaries Include="$(TargetPath)" LocalDir="/" PackDir="plugins" />
+      <Binaries Include="$(TargetDir)/$(TargetName).pdb" LocalDir="/" PackDir="plugins" />
+      <!-- [Godhome] 双语文本（I18N 读取）、Boss 数据表、神居存档的满配表 -->
+      <Binaries Include="languages/*.json" LocalDir="languages" PackDir="plugins/languages" />
+      <Binaries Include="../../data/bosses.json" LocalDir="data" PackDir="plugins/data" />
+      <Binaries Include="../../data/kit.json" LocalDir="data" PackDir="plugins/data" />
+      <Binaries Include="../../data/pantheons.json" LocalDir="data" PackDir="plugins/data" />
+      <Binaries Include="../../data/hk1.json" LocalDir="data" PackDir="plugins/data" />
+    </ItemGroup>
+    <PropertyGroup>
+      <ThunderstoreDir>$(ProjectDir)/thunderstore</ThunderstoreDir>
+    </PropertyGroup>
+
+    <!-- Local install -->
+    <Copy SourceFiles="@(Binaries)" DestinationFolder="$(SilksongPluginsFolder)/local-$(AssemblyTitle)/%(Binaries.LocalDir)" Condition="'$(SilksongPluginsFolder)' != '' And Exists('$(SilksongPluginsFolder)')" />
+
+    <!-- Thunderstore packaging（[Godhome] 只在 -p:GodhomePackage=true 时运行；不会上传，只在本地生成 zip） -->
+    <RemoveDir Directories="$(ThunderstoreDir)/temp;$(ThunderstoreDir)/dist" Condition="'$(GodhomePackage)' == 'true'" />
+    <MakeDir Directories="$(ThunderstoreDir)/temp" Condition="'$(GodhomePackage)' == 'true'" />
+    <Copy SourceFiles="@(Binaries)" DestinationFolder="$(ThunderstoreDir)/temp/%(Binaries.PackDir)" Condition="'$(GodhomePackage)' == 'true'" />
+    <PropertyGroup>
+      <ThunderstorePkgVersion>$([System.String]::Copy($(Version)).Split('-')[0])</ThunderstorePkgVersion>
+    </PropertyGroup>
+    <Exec Command="dotnet tool restore" Condition="'$(GodhomePackage)' == 'true'" />
+    <Exec Condition="'$(GodhomePackage)' == 'true'" Command="dotnet tcli build --config-path &quot;$(ThunderstoreDir)/thunderstore.toml&quot; --package-name &quot;$(AssemblyTitle)&quot; --package-version $(ThunderstorePkgVersion)" StandardOutputImportance="High" StandardErrorImportance="High" />
+  </Target>
+</Project>

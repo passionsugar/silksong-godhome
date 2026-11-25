@@ -1,0 +1,67 @@
+{
+  "$comment": "[Godhome] 万神殿（照前作神居的五个万神殿）。bosses 是 data/bosses.json 里的 id，按出场顺序；rests 是“打完第几个以后去休息点”（从 1 数）；requires 是要先完成的万神殿。名字、说明是我们自己写的，不用前作的文字。束缚参数照前作 BossSequence（骨钉封顶 13、已经低于封顶打八折；最多 4 格血），丝之歌没有灵魂，用丝上限 9 代替（刚够一次缚丝回血）。",
+  "schemaVersion": 1,
+  "bindings": {
+    "needleCap": 13,
+    "needleLowerPercent": 0.8,
+    "maxMasks": 4,
+    "maxSilk": 9
+  },
+  "rest": {
+    "$comment": "休息点：真实的长椅房间（织巢的长椅房，神居存档里平时被圣所占用；休息时不搭圣所，就是原来的房间）。醒来坐在长椅上（长椅回满血），从房间的任意出口离开就进下一场。",
+    "scene": "Weave_07",
+    "marker": "RestBench"
+  },
+  "pantheons": [
+    {
+      "id": "p1",
+      "name": { "zh": "针师万神殿", "en": "Pantheon of the Needle" },
+      "desc": { "zh": "初试锋芒的猎者，在这里重温最初的敌手。", "en": "Where a young hunter relives her first foes." },
+      "emblem": "lace_1",
+      "bosses": ["moss_mother", "bell_beast", "fourth_chorus", "savage_beastfly", "sister_splinter", "skull_tyrant", "great_conchflies", "moorwing", "widow", "lace_1"],
+      "rests": [],
+      "requires": []
+    },
+    {
+      "id": "p2",
+      "name": { "zh": "伶人万神殿", "en": "Pantheon of the Performer" },
+      "desc": { "zh": "伶人与狂徒登台，为织忆献上一出出戏。", "en": "Players and zealots take the stage for the Loom." },
+      "emblem": "trobbio",
+      "bosses": ["phantom", "last_judge", "forebrothers", "gurr", "lugoli", "groal", "crawfather", "voltvyrm", "raging_conchfly", "trobbio"],
+      "rests": [],
+      "requires": []
+    },
+    {
+      "id": "p3",
+      "name": { "zh": "歌者万神殿", "en": "Pantheon of the Singer" },
+      "desc": { "zh": "圣堡的歌声里，藏着最难缠的对手。", "en": "Within the Citadel's song wait its fiercest foes." },
+      "emblem": "lace_2",
+      "bosses": ["father_of_the_flame", "broodmother", "first_sinner", "cogwork_dancers", "the_unravelled", "second_sentinel", "savage_beastfly_2", "shakra", "garmond_zaza", "lace_2"],
+      "rests": [],
+      "requires": []
+    },
+    {
+      "id": "p4",
+      "name": { "zh": "守望万神殿", "en": "Pantheon of the Watcher" },
+      "desc": { "zh": "守在天涯尽头的强者，静候来者。", "en": "The strong who keep watch at the edges, waiting." },
+      "emblem": "hunter_queen",
+      "bosses": ["clover_dancers", "palestag", "nyleth", "crust_king_khann", "seth", "pinstress", "watcher_at_the_edge", "bell_eater", "plasmified_zango", "karmelita"],
+      "rests": [],
+      "requires": []
+    },
+    {
+      "id": "p5",
+      "name": { "zh": "法鲁姆万神殿", "en": "Pantheon of Pharloom" },
+      "desc": { "zh": "法鲁姆的一切记忆，一线不断。", "en": "All of Pharloom's memories, in one unbroken thread." },
+      "emblem": "100_percent",
+      "bosses": [
+        "moss_mother", "bell_beast", "fourth_chorus", "savage_beastfly", "sister_splinter", "skull_tyrant", "great_conchflies", "moorwing", "widow", "lace_1", "phantom", "last_judge",
+        "forebrothers", "gurr", "lugoli", "groal", "crawfather", "father_of_the_flame", "voltvyrm", "raging_conchfly", "broodmother", "first_sinner", "cogwork_dancers", "trobbio",
+        "the_unravelled", "second_sentinel", "savage_beastfly_2", "shakra", "garmond_zaza", "lace_2", "clover_dancers", "palestag", "nyleth", "crust_king_khann", "seth", "pinstress",
+        "watcher_at_the_edge", "bell_eater", "plasmified_zango", "karmelita", "skull_tyrant_invasion", "moss_mother_duo", "tormented_trobbio", "lost_garmond", "summoned_saviour", "grand_mother_silk", "lost_lace"
+      ],
+      "rests": [12, 24, 36],
+      "requires": ["p1", "p2", "p3", "p4"]
+    }
+  ]
+}

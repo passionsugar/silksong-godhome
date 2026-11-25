@@ -1,0 +1,3583 @@
+{
+  "$comment": "[Godhome] Boss 数据表。代码里不硬编码任何 Boss，新增 Boss（例如 DLC）只需补一条。字段说明见 docs/boss-inventory.md。",
+  "schemaVersion": 2,
+  "gameBuild": "Steam buildid 22479045 / Unity 6000.0.50f1",
+  "$statues": "忆像长廊的雕像分组（第二版·3）：同一个 Boss 的几个版本放在同一尊雕像上，用拉杆切换；variants 第一个是默认版本，black 里的标成黑线版。没列出的 Boss 各自一尊。",
+  "statues": [
+    {
+      "id": "moss_mother",
+      "variants": [
+        "moss_mother",
+        "moss_mother_duo"
+      ]
+    },
+    {
+      "id": "lace",
+      "variants": [
+        "lace_1",
+        "lace_2",
+        "lost_lace"
+      ],
+      "black": [
+        "lost_lace"
+      ]
+    },
+    {
+      "id": "savage_beastfly",
+      "variants": [
+        "savage_beastfly",
+        "savage_beastfly_2"
+      ]
+    },
+    {
+      "id": "skull_tyrant",
+      "variants": [
+        "skull_tyrant",
+        "skull_tyrant_invasion"
+      ]
+    },
+    {
+      "id": "trobbio",
+      "variants": [
+        "trobbio",
+        "tormented_trobbio"
+      ]
+    },
+    {
+      "id": "garmond",
+      "variants": [
+        "garmond_zaza",
+        "lost_garmond"
+      ],
+      "black": [
+        "lost_garmond"
+      ]
+    },
+    {
+      "id": "zango",
+      "variants": [
+        "plasmified_zango"
+      ],
+      "black": [
+        "plasmified_zango"
+      ]
+    }
+  ],
+  "bosses": [
+    {
+      "id": "moss_mother",
+      "name": {
+        "zh": "苔藓之母",
+        "en": "Moss Mother"
+      },
+      "variant": {
+        "zh": "初遇",
+        "en": "First Encounter"
+      },
+      "titleKey": "MOSSBONE_MOTHER",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "BONETOWN",
+        "zh": "骸底镇",
+        "en": "Bone Bottom"
+      },
+      "scene": "Tut_03",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Tut_03"
+      },
+      "arena": {
+        "door": [
+          54.1,
+          18.6
+        ],
+        "face": "right",
+        "wake": {
+          "battle": "Black Thread States/Normal World/Battle Scene"
+        },
+        "patch": [
+          {
+            "type": "start",
+            "path": "Black Thread States/Normal World/Moss Vine Cluster",
+            "fsm": "Control",
+            "state": "Activated"
+          },
+          {
+            "type": "start",
+            "path": "Black Thread States/Normal World/Moss Vine Cluster (1)",
+            "fsm": "Control",
+            "state": "Activated"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Mossbone Mother"
+      ],
+      "hp": {
+        "Mossbone Mother": 120
+      },
+      "flags": {
+        "defeated": [
+          "defeatedMossMother"
+        ],
+        "encountered": [
+          "encounteredMossMother"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": false
+        }
+      },
+      "journal": [
+        "Mossbone Mother"
+      ],
+      "notes": "第一个 Boss，血量只有 120。场景同时是去骸底镇的通道，有剧情门 door1 firstExit。"
+    },
+    {
+      "id": "bell_beast",
+      "name": {
+        "zh": "钟道兽",
+        "en": "Bell Beast"
+      },
+      "variant": null,
+      "titleKey": "BELLBEAST",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "PATH_OF_BONE",
+        "zh": "髓骨洞窟",
+        "en": "The Marrow"
+      },
+      "scene": "Bone_05_boss",
+      "additive": true,
+      "hostScene": "Bone_05",
+      "additiveLoader": {
+        "object": "Boss Additive Loader",
+        "tests": {
+          "TestGroups": [
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "defeatedBellBeast",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            }
+          ]
+        },
+        "quests": []
+      },
+      "entry": {
+        "scene": "Bone_05"
+      },
+      "arena": {
+        "door": [
+          85.5,
+          4.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Scene/Return Battle",
+          "fsm": "Start Return Battle",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Bone Beast"
+      ],
+      "hp": {
+        "Bone Beast": 150
+      },
+      "flags": {
+        "defeated": [
+          "defeatedBellBeast"
+        ],
+        "encountered": [
+          "encounteredBellBeast"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "附加场景 Bone_05_boss，由 Bone_05 的 Boss Additive Loader 在 defeatedBellBeast=false 时加载。打完连着丝之心记忆演出。"
+    },
+    {
+      "id": "lace_1",
+      "name": {
+        "zh": "蕾丝",
+        "en": "Lace"
+      },
+      "variant": {
+        "zh": "初次交锋",
+        "en": "First Duel"
+      },
+      "titleKey": "LACE",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "DOCKS",
+        "zh": "深坞",
+        "en": "Deep Docks"
+      },
+      "scene": "Bone_East_12",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Bone_East_12"
+      },
+      "arena": {
+        "door": [
+          95.8,
+          8.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Lace Boss1",
+          "fsm": "Control",
+          "state": "Dormant"
+        }
+      },
+      "bossObjects": [
+        "Lace Boss1"
+      ],
+      "hp": {
+        "Lace Boss1": 250
+      },
+      "flags": {
+        "defeated": [
+          "defeatedLace1"
+        ],
+        "encountered": [
+          "encounteredLace1"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "蕾丝第一战。场景里有 DEMO 用的战斗门，注意别触发。"
+    },
+    {
+      "id": "fourth_chorus",
+      "name": {
+        "zh": "第四圣咏团",
+        "en": "Fourth Chorus"
+      },
+      "variant": null,
+      "titleKey": "SONG_GOLEM",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "WILDS",
+        "zh": "远野",
+        "en": "Far Fields"
+      },
+      "scene": "Bone_East_08_boss_golem",
+      "additive": true,
+      "hostScene": "Bone_East_08",
+      "additiveLoader": {
+        "object": "Boss Golem Loader",
+        "tests": {
+          "TestGroups": [
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "defeatedSongGolem",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                },
+                {
+                  "Type": 0,
+                  "FieldName": "hasBrolly",
+                  "BoolValue": 1,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            }
+          ]
+        },
+        "quests": []
+      },
+      "entry": {
+        "scene": "Bone_East_08"
+      },
+      "arena": {
+        "door": [
+          78.0,
+          8.1
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Remeet Ready"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/song_golem",
+            "fsm": "Control",
+            "state": "Death Start"
+          }
+        ]
+      },
+      "bossObjects": [
+        "SG_head"
+      ],
+      "hp": {
+        "SG_head": 500
+      },
+      "flags": {
+        "defeated": [
+          "defeatedSongGolem"
+        ],
+        "encountered": [
+          "encounteredSongGolem"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "hasBrolly": true
+        }
+      },
+      "journal": [
+        "Song Golem"
+      ],
+      "notes": "附加场景。加载条件 defeatedSongGolem=false 且 hasBrolly=true（需要先拿到伞）。另有 _rest 附加场景是战前休眠状态。"
+    },
+    {
+      "id": "savage_beastfly",
+      "name": {
+        "zh": "残暴的兽蝇",
+        "en": "Savage Beastfly"
+      },
+      "variant": {
+        "zh": "野兽教堂",
+        "en": "Chapel of the Beast"
+      },
+      "titleKey": "GIANT_BONE_FLYER",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "HUNTERS_NEST",
+        "zh": "猎者小径",
+        "en": "Hunter’s March"
+      },
+      "scene": "Ant_19",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Ant_19"
+      },
+      "arena": {
+        "door": [
+          49.6,
+          35.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Control/Boss Scene",
+          "fsm": "Control",
+          "state": "Idle"
+        },
+        "end": [
+          {
+            "path": "Boss Control/Boss Scene",
+            "fsm": "Control",
+            "state": "Defeated Pause"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Bone Flyer Giant"
+      ],
+      "hp": {
+        "Bone Flyer Giant": 550
+      },
+      "flags": {
+        "defeated": [
+          "defeatedBoneFlyerGiant"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Bone Flyer Giant"
+      ],
+      "notes": "野兽教堂（猎者小径）的纹章试炼战，血量 550。场景出口 door_memoryEnd 说明它和纹章记忆演出连在一起。"
+    },
+    {
+      "id": "sister_splinter",
+      "name": {
+        "zh": "碎裂者长姊",
+        "en": "Sister Splinter"
+      },
+      "variant": null,
+      "titleKey": "SPLINTER_QUEEN",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "SHELLWOOD_THICKET",
+        "zh": "壳木林",
+        "en": "Shellwood"
+      },
+      "scene": "Shellwood_18",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Shellwood_18"
+      },
+      "arena": {
+        "door": [
+          51.4,
+          9.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Scene Parent/Boss Scene",
+          "fsm": "Battle Control",
+          "state": "Idle"
+        },
+        "enter": [
+          {
+            "type": "event",
+            "path": "Boss Scene Parent/Boss Scene",
+            "fsm": "Battle Control",
+            "event": "ENTER"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Splinter Queen"
+      ],
+      "hp": {
+        "Splinter Queen": 310
+      },
+      "flags": {
+        "defeated": [
+          "defeatedSplinterQueen"
+        ],
+        "encountered": [
+          "encounteredSplinterQueen"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": ""
+    },
+    {
+      "id": "skull_tyrant",
+      "name": {
+        "zh": "颅骨暴君",
+        "en": "Skull Tyrant"
+      },
+      "variant": {
+        "zh": "髓骨洞窟",
+        "en": "The Marrow"
+      },
+      "titleKey": "SKULL_KING",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "PATH_OF_BONE",
+        "zh": "髓骨洞窟",
+        "en": "The Marrow"
+      },
+      "scene": "Bone_15",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Bone_15"
+      },
+      "arena": {
+        "door": [
+          99.6,
+          15.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Skull King",
+          "fsm": "Protect From Below",
+          "state": "Can't Attack"
+        }
+      },
+      "bossObjects": [
+        "Skull King"
+      ],
+      "hp": {
+        "Skull King": 450
+      },
+      "flags": {
+        "defeated": [
+          "skullKingDefeated"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "场景里有 Pierce Dmg Receiver（hp 9999999）辅助物体，统计血量时要排除。"
+    },
+    {
+      "id": "widow",
+      "name": {
+        "zh": "黑寡妇",
+        "en": "Widow"
+      },
+      "variant": null,
+      "titleKey": "SPINNER",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "BELLTOWN",
+        "zh": "钟心镇",
+        "en": "Bellhart"
+      },
+      "scene": "Belltown_Shrine",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Belltown_Shrine"
+      },
+      "arena": {
+        "door": [
+          54.4,
+          9.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene",
+            "fsm": "Control",
+            "state": "Sequence End"
+          },
+          {
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
+            "fsm": "Control",
+            "state": "Final Bind Burst"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Spinner Boss"
+      ],
+      "hp": {
+        "Spinner Boss": 360
+      },
+      "flags": {
+        "defeated": [
+          "spinnerDefeated"
+        ],
+        "encountered": [
+          "encounteredSpinner"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "debug": {
+        "$comment": "黑寡妇血量打空后停在 Can Bind，等玩家按缚丝键（ListenForCast BIND）；每缚一次 Binds 减一，没缚完回 Rebind Ready 再等，缚完（Bind Burst 的 SHIFT）进 Final Bind Burst 收尾。自检替玩家按。",
+        "react": [
+          {
+            "type": "event",
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
+            "fsm": "Control",
+            "when": "Can Bind|Rebind Ready",
+            "after": 0.5,
+            "event": "BIND"
+          }
+        ]
+      },
+      "notes": "有 Fake Death 状态（假死）；打完给针琴，并触发钟心镇剧情。出口有 door_wakeOnGround。"
+    },
+    {
+      "id": "great_conchflies",
+      "name": {
+        "zh": "巨型螺蝇",
+        "en": "Great Conchflies"
+      },
+      "variant": null,
+      "titleKey": "DRILLERS",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "JUDGE_STEPS",
+        "zh": "风蚀长阶",
+        "en": "Blasted Steps"
+      },
+      "scene": "Coral_11",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_11"
+      },
+      "arena": {
+        "door": [
+          61.8,
+          15.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene",
+          "fsm": "Control",
+          "state": "Restart Ready"
+        },
+        "end": [
+          {
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene",
+            "fsm": "Control",
+            "state": "Kill Final Driller"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Driller A"
+      ],
+      "hp": {
+        "Driller A": 400
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCoralDrillers"
+        ],
+        "encountered": [
+          "encounteredCoralDrillers"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": false,
+          "coralDrillerSoloReady": false
+        }
+      },
+      "journal": [
+        "Coral Conch Driller Giant"
+      ],
+      "notes": "双 Boss；静态扫描只看到 Driller A，第二只可能运行时生成。Boss Scene 里有 needolin_capture_timer。"
+    },
+    {
+      "id": "moorwing",
+      "name": {
+        "zh": "荒沼翼主",
+        "en": "Moorwing"
+      },
+      "variant": null,
+      "titleKey": "VAMPIRE_GNAT",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "GREYMOOR",
+        "zh": "灰沼",
+        "en": "Greymoor"
+      },
+      "scene": "Greymoor_05_boss",
+      "additive": true,
+      "hostScene": "Greymoor_05",
+      "additiveLoader": {
+        "object": "Vampire Gnat Boss Scene",
+        "tests": {},
+        "quests": []
+      },
+      "entry": {
+        "scene": "Greymoor_05"
+      },
+      "arena": {
+        "door": [
+          50.8,
+          6.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Vampire Gnat Boss Scene",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Vampire Gnat"
+      ],
+      "hp": {
+        "Vampire Gnat": 600
+      },
+      "flags": {
+        "defeated": [
+          "defeatedVampireGnatBoss"
+        ],
+        "encountered": [
+          "encounteredVampireGnatBoss"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "allowVampireGnatInAltLoc": true,
+          "visitedBellhart": true,
+          "visitedCitadel": true,
+          "greymoor05_clearedOut": false,
+          "encounteredVampireGnatBoss": true
+        }
+      },
+      "journal": [
+        "Vampire Gnat"
+      ],
+      "notes": "附加场景。另有备用地点 Greymoor_08_boss（未去过钟心镇时出现，加载条件 visitedBellhart=false）。"
+    },
+    {
+      "id": "phantom",
+      "name": {
+        "zh": "幽影",
+        "en": "Phantom"
+      },
+      "variant": null,
+      "titleKey": "PHANTOM",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Organ_01",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Organ_01"
+      },
+      "arena": {
+        "$comment": "开战的是场景总控 Boss Scene::Control：[Init] 用 SendTrigger2DEvent 等玩家进 Boss Scene 自己的触发区，进了才走 Enter → 风琴 → 雾柱 → Start Battle，给 Phantom 发 PHANTOM START（Phantom::Control 一直停在 Dormant 等这个事件）。入场门放在这个触发区里。",
+        "door": [
+          84.4,
+          105.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Init"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Phantom",
+            "fsm": "Control",
+            "state": "UI Msg"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Phantom"
+      ],
+      "hp": {
+        "Phantom": 650
+      },
+      "flags": {
+        "defeated": [
+          "defeatedPhantom"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Phantom"
+      ],
+      "debug": {
+        "holdKill": [
+          {
+            "path": "Boss Scene/Phantom",
+            "fsm": "Control",
+            "when": "Init|Dormant|Appear"
+          }
+        ],
+        "react": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Phantom",
+            "fsm": "Control",
+            "when": "Parry Ready",
+            "event": "PARRY"
+          }
+        ],
+        "timeout": 120
+      },
+      "notes": "废鸣管风琴。场景里有 thread_memory_lace 的深层记忆入口，别误触。"
+    },
+    {
+      "id": "last_judge",
+      "name": {
+        "zh": "末代裁决者",
+        "en": "Last Judge"
+      },
+      "variant": null,
+      "titleKey": "LAST_JUDGE",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "JUDGE_STEPS",
+        "zh": "风蚀长阶",
+        "en": "Blasted Steps"
+      },
+      "scene": "Coral_Judge_Arena",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_Judge_Arena"
+      },
+      "arena": {
+        "door": [
+          53.3,
+          30.7
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Encountered"
+        }
+      },
+      "bossObjects": [
+        "Last Judge"
+      ],
+      "hp": {
+        "Last Judge": 720
+      },
+      "flags": {
+        "defeated": [
+          "defeatedLastJudge"
+        ],
+        "encountered": [
+          "encounteredLastJudge"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "第一幕最终 Boss。场景里有大门、守门朝圣者 NPC、跳蚤旅团到达点（door_caravanTravelEnd），状态多。"
+    },
+    {
+      "id": "forebrothers",
+      "name": {
+        "zh": "监工兄弟西格尼斯 & 格隆",
+        "en": "Forebrothers Signis & Gron"
+      },
+      "variant": null,
+      "titleKey": "DOCK_GUARD_DUO",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "DOCKS",
+        "zh": "深坞",
+        "en": "Deep Docks"
+      },
+      "scene": "Dock_09",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Dock_09"
+      },
+      "arena": {
+        "$comment": "开战的是场景总控 Boss Scene::Control：[Battle Ready] 用 CheckAlertRangeByName 等玩家进 Battle Start Range（x≈21，西格尼斯旁边），进了才给西格尼斯发 BATTLE START。入场门放在这个范围里。",
+        "door": [
+          26.5,
+          8.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Battle Ready"
+        },
+        "end": [
+          {
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "state": "End Pause"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Dock Guard Slasher",
+        "Dock Guard Thrower"
+      ],
+      "hp": {
+        "Dock Guard Slasher": 720,
+        "Dock Guard Thrower": 520
+      },
+      "flags": {
+        "defeated": [
+          "defeatedDockForemen"
+        ],
+        "encountered": [
+          "encounteredDockForemen"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Dock Guard Thrower",
+        "Dock Guard Slasher"
+      ],
+      "notes": "双 Boss（西格尼斯 720 / 格隆 520）。Dock_02b 里还有一个不可击杀的格隆遭遇（hp 9999）。"
+    },
+    {
+      "id": "gurr",
+      "name": {
+        "zh": "被放逐的格尔",
+        "en": "Gurr The Outcast"
+      },
+      "variant": null,
+      "titleKey": "HUNTER_TRAPPER",
+      "tier": "boss",
+      "act": 1,
+      "region": {
+        "key": "WILDS",
+        "zh": "远野",
+        "en": "Far Fields"
+      },
+      "scene": "Bone_East_18b",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Bone_East_18b"
+      },
+      "arena": {
+        "door": [
+          170.2,
+          7.4
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Bone Hunter Trapper"
+      ],
+      "hp": {
+        "Bone Hunter Trapper": 1000
+      },
+      "flags": {
+        "defeated": [
+          "defeatedAntTrapper"
+        ],
+        "encountered": [
+          "encounteredAntTrapper"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "场景里有大量 Intro Barb 和陷阱尖刺 FSM，开场演出较长。"
+    },
+    {
+      "id": "craggler",
+      "name": {
+        "zh": "悬峭兽",
+        "en": "Craggler"
+      },
+      "variant": null,
+      "titleKey": null,
+      "tier": "mini",
+      "act": 1,
+      "region": {
+        "key": "PATH_OF_BONE",
+        "zh": "髓骨洞窟",
+        "en": "The Marrow"
+      },
+      "scene": "Crawl_04",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Crawl_04"
+      },
+      "arena": {
+        "door": [
+          79.5,
+          5.0
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Roof Crab",
+          "fsm": "Control",
+          "state": "Dormant"
+        }
+      },
+      "bossObjects": [
+        "Roof Crab"
+      ],
+      "hp": {
+        "Roof Crab": 200
+      },
+      "flags": {
+        "defeated": [
+          "roofCrabDefeated"
+        ],
+        "encountered": [
+          "roofCrabEncountered"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "小 Boss（hp 200，无标题卡）。"
+    },
+    {
+      "id": "lugoli",
+      "name": {
+        "zh": "失格大厨卢戈利",
+        "en": "Disgraced Chef Lugoli"
+      },
+      "variant": null,
+      "titleKey": "CHEF",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "DUSTPENS",
+        "zh": "罪途",
+        "en": "Sinner’s Road"
+      },
+      "scene": "Dust_Chef",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Dust_Chef"
+      },
+      "arena": {
+        "$comment": "战斗由 Battle Scene 驱动。开战要玩家敲厨房的锣：Kitchen Pipe Gong::Gong Hit Reaction 收到全局 GONG HIT、确认人站在 Hero Detector 里，才锁门并调 Battle Scene 的 StartBattle。入场门放在 Hero Detector 里，进场后广播 GONG HIT。原版第 1 波是两只小蟑螂厨子（Roachkeeper Chef Tiny），神居版跳过（skipWaves），开战直接是第 2 波卢戈利（原版延迟 3 秒出场）。背景里干活的那只（Roachkeeper Chef Tiny (2)）原版由第 1 波叫起来，跳过后一直在背景里，不参战。",
+        "door": [
+          41.9,
+          36.6
+        ],
+        "face": "left",
+        "wake": {
+          "battle": "Battle Parent/Battle Scene"
+        },
+        "skipWaves": [
+          "Battle Parent/Battle Scene/Wave 1"
+        ],
+        "enter": [
+          {
+            "type": "register",
+            "event": "GONG HIT",
+            "delay": 0.5
+          }
+        ]
+      },
+      "bossObjects": [
+        "Roachkeeper Chef (1)"
+      ],
+      "hp": {
+        "Roachkeeper Chef (1)": 600
+      },
+      "flags": {
+        "defeated": [
+          "defeatedRoachkeeperChef"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "战斗由 Battle Scene 驱动。原版第 1 波是两只小蟑螂厨子，神居版跳过，开战直接是第 2 波卢戈利。开战要玩家敲厨房的锣（见 arena.$comment）。"
+    },
+    {
+      "id": "groal",
+      "name": {
+        "zh": "伟大的格洛",
+        "en": "Groal The Great"
+      },
+      "variant": null,
+      "titleKey": "SWAMP_SHAMAN",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "SWAMP",
+        "zh": "腐汁泽",
+        "en": "Bilewater"
+      },
+      "scene": "Shadow_18",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Shadow_18"
+      },
+      "arena": {
+        "$comment": "原版 Battle Scene 前 5 波是小怪（泥沼怪、蚊子，第 3、5 波还有摆锤陷阱），第 6 波才是格洛：神居版跳过前 5 波（skipWaves），开战直接打格洛。第 1 波顺带打开的 CamLock BellSequence 和战斗自己的镜头锁（CamLocks/CameraLockArea Battle）位置、大小一样，不用补。",
+        "door": [
+          56.5,
+          12.5
+        ],
+        "face": "right",
+        "wake": {
+          "battle": "Battle Scene"
+        },
+        "skipWaves": [
+          "Battle Scene/Wave 1 - also activate bell camlock",
+          "Battle Scene/Wave 2",
+          "Battle Scene/Wave 3 - Trap Swings",
+          "Battle Scene/Wave 4",
+          "Battle Scene/Wave 5 - Trap Swingsx2"
+        ],
+        "end": [
+          {
+            "path": "Battle Scene/Wave 6 - Boss/Swamp Shaman",
+            "fsm": "Control",
+            "state": "Death Hit"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Swamp Shaman"
+      ],
+      "hp": {
+        "Swamp Shaman": 650
+      },
+      "flags": {
+        "defeated": [
+          "DefeatedSwampShaman"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "有 Boss Summon Crew（召唤杂兵）。"
+    },
+    {
+      "id": "crawfather",
+      "name": {
+        "zh": "鸦虫教父",
+        "en": "Crawfather"
+      },
+      "variant": null,
+      "titleKey": "CROWFATHER",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "GREYMOOR",
+        "zh": "灰沼",
+        "en": "Greymoor"
+      },
+      "scene": "Room_CrowCourt_02",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Room_CrowCourt_02"
+      },
+      "arena": {
+        "$comment": "原版 Battle Scene 前 5 波是鸦人陪审员，第 6 波才是鸦虫教父：神居版跳过前 5 波（skipWaves），开战直接打鸦虫教父（原版延迟 2 秒出场）。第 1、3、5 波的 Wave Starter 只管人群吼叫和叫本波的小怪开打。战斗中鸦虫教父叫来的陪审员（Crow Summons）是 Boss 自己的招式，不动。",
+        "door": [
+          35.2,
+          22.6
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Battle Scene/Battle Start",
+          "fsm": "Battle Start",
+          "state": "Idle"
+        },
+        "skipWaves": [
+          "Battle Scene/Wave 1",
+          "Battle Scene/Wave 2",
+          "Battle Scene/Wave 3",
+          "Battle Scene/Wave 4",
+          "Battle Scene/Wave 5"
+        ]
+      },
+      "bossObjects": [
+        "Crawfather"
+      ],
+      "hp": {
+        "Crawfather": 1300
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCrowCourt"
+        ],
+        "encountered": [
+          "encounteredCrowCourt"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "鸦虫审判庭。唯一出口 top1 通往 Room_CrowCourt，Battle Scene 有 Revisit 状态。"
+    },
+    {
+      "id": "father_of_the_flame",
+      "name": {
+        "zh": "炽焰之父",
+        "en": "Father of the Flame"
+      },
+      "variant": null,
+      "titleKey": "WICKER_BUG",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "WISP",
+        "zh": "火灵竹丛",
+        "en": "Wisp Thicket"
+      },
+      "scene": "Belltown_08",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Belltown_08"
+      },
+      "arena": {
+        "$comment": "Summon Control：Init → Set HP（等 3 秒或 Gate Range 的 ENTER）→ Dormant（等 ENTER）→ Close Gates。落点在 Gate Range 里，Set HP 直接收到 ENTER，不经过 Dormant，所以两个都算等待状态。",
+        "door": [
+          59.0,
+          10.0
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Scene/Wisp Pyre Effigy",
+          "fsm": "Summon Control",
+          "state": "Set HP|Dormant"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Wisp Pyre Effigy",
+            "fsm": "Summon Control",
+            "state": "Final Hit"
+          },
+          {
+            "path": "Boss Scene/Wisp Pyre Effigy",
+            "fsm": "Summon Control",
+            "state": "Activate Collectable"
+          },
+          {
+            "path": "Boss Scene/Wisp Pyre Effigy",
+            "fsm": "Summon Control",
+            "state": "Award"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Wisp Pyre Effigy"
+      ],
+      "hp": {},
+      "flags": {
+        "defeated": [
+          "defeatedWispPyreEffigy"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Wisp Pyre Effigy"
+      ],
+      "debug": {
+        "kill": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Wisp Pyre Effigy",
+            "fsm": "Summon Control",
+            "event": "FINAL BREAK"
+          }
+        ]
+      },
+      "notes": "静态扫描在 Wisp_07 只找到 defeatedWispPyreEffigy 标记，没找到 Boss 的 HealthManager——Boss 可能是运行时生成的预制体。阶段 1 必须实机确认。"
+    },
+    {
+      "id": "voltvyrm",
+      "name": {
+        "zh": "伏特维姆",
+        "en": "Voltvyrm"
+      },
+      "variant": null,
+      "titleKey": "ZAPNEST_BOSS",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "CORAL_CAVERNS",
+        "zh": "卡拉卡沙川",
+        "en": "Sands of Karak"
+      },
+      "scene": "Coral_29",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_29"
+      },
+      "arena": {
+        "$comment": "开战的是伏特维姆自己 Zap Core Enemy::Control [Dormant]：CheckAlertRange 等玩家进它的 Alert Range。场地里还有远处叫声的音效触发区（Audio Zap Boss Distant Call），和开战无关。入场门放在 Alert Range 里。",
+        "door": [
+          170.0,
+          25.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Zap Core Enemy",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Zap Core Enemy",
+            "fsm": "Control",
+            "state": "Death Hit"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Zap Core Enemy"
+      ],
+      "hp": {
+        "Zap Core Enemy": 550
+      },
+      "flags": {
+        "defeated": [
+          "defeatedZapCoreEnemy"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "唯一出口 left1（来自 Coral_35b 的门）。"
+    },
+    {
+      "id": "raging_conchfly",
+      "name": {
+        "zh": "狂暴的螺蝇",
+        "en": "Raging Conchfly"
+      },
+      "variant": null,
+      "titleKey": "DRILLER_SOLO",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "CORAL_CAVERNS",
+        "zh": "卡拉卡沙川",
+        "en": "Sands of Karak"
+      },
+      "scene": "Coral_27",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_27"
+      },
+      "arena": {
+        "door": [
+          16.3,
+          34.6
+        ],
+        "face": "left",
+        "wake": {
+          "battle": "Battle Scene"
+        }
+      },
+      "bossObjects": [
+        "Coral Conch Driller Giant Solo"
+      ],
+      "hp": {
+        "Coral Conch Driller Giant Solo": 820
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCoralDrillerSolo"
+        ],
+        "encountered": [
+          "encounteredCoralDrillerSolo"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "statueArt": [
+        "Coral Conch Driller Giant"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "broodmother",
+      "name": {
+        "zh": "育母",
+        "en": "Broodmother"
+      },
+      "variant": null,
+      "titleKey": "BROODMOTHER",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "THE_SLAB",
+        "zh": "罪石牢狱",
+        "en": "The Slab"
+      },
+      "scene": "Slab_16b",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Slab_16b"
+      },
+      "arena": {
+        "$comment": "原版 Battle Scene Broodmother 前 3 波是石板蝇，第 4 波才是育母：神居版跳过前 3 波（skipWaves），开战直接打育母（原版延迟 2 秒出场）。战斗中育母自己生的小蝇（Spawner Flies）不动。开战靠 Battle Scene Broodmother 自己的触发框（x 55.9–75.3、y 2.0–18.4）；场地地面在 y≈4.6（草、尸体标记都在这个高度），育母藏在地板下面 (61.6, -1.3)。入场门放在触发框里、育母右边的草地上，朝左。草稿原来把门放在育母身上 (61.6, -0.8)，人落到地板下面，碰不到触发框，一直不开战（2026-11-24 冒烟测试）。",
+        "door": [
+          67.5,
+          7.5
+        ],
+        "face": "left",
+        "wake": {
+          "battle": "Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother"
+        },
+        "skipWaves": [
+          "Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 1",
+          "Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 2",
+          "Broodmother Scene Control/Broodmother Scene/Battle Scene Broodmother/Wave 3"
+        ]
+      },
+      "bossObjects": [
+        "Slab Fly Broodmother"
+      ],
+      "hp": {
+        "Slab Fly Broodmother": 700
+      },
+      "flags": {
+        "defeated": [
+          "defeatedBroodMother"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": ""
+    },
+    {
+      "id": "first_sinner",
+      "name": {
+        "zh": "原初罪者",
+        "en": "First Sinner"
+      },
+      "variant": null,
+      "titleKey": "FIRST_WEAVER",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "THE_SLAB",
+        "zh": "罪石牢狱",
+        "en": "The Slab"
+      },
+      "scene": "Slab_10b",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Slab_10b"
+      },
+      "arena": {
+        "$comment": "原版要在神龛（Shrine First Weaver，PlayMakerNPC）按交互、再按缚丝键，原初罪者才从天上落下开打；神龛的 Inspection：Idle（INTERACT）→ Look Back（人无敌、移到神龛前）→ 见过（encounteredFirstWeaver）走 Bind Prepare Refight → Bind Ready / Bind Prompt 等缚丝键 → Bind Start … Shoot Down → Intro Land 给 First Weaver 发 INTRO。神居版进去就打：保留神龛（keep），进场后发 INTERACT，Bind Prepare Refight 的 FINISHED 直接到 Bind Start（不等缚丝键），后面原样播。整个 Boss Scene 带 DeactivateIfPlayerdataTrue(hasSilkBomb)，神龛 Init 也是 hasSilkBomb 为真就 COMPLETE，所以前置条件临时设 hasSilkBomb=false。门在神龛前的地上（Look Back 也会把人挪到神龛的 x）。",
+        "door": [
+          38.3,
+          9.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/First Weaver",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "enter": [
+          {
+            "type": "event",
+            "path": "Shrine First Weaver",
+            "fsm": "Inspection",
+            "when": "Idle",
+            "event": "INTERACT"
+          }
+        ],
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Shrine First Weaver",
+            "fsm": "Inspection",
+            "from": "Bind Prepare Refight",
+            "event": "FINISHED",
+            "to": "Bind Start"
+          }
+        ],
+        "keep": [
+          "Shrine First Weaver"
+        ]
+      },
+      "bossObjects": [
+        "First Weaver"
+      ],
+      "hp": {
+        "First Weaver": 1300
+      },
+      "flags": {
+        "defeated": [
+          "defeatedFirstWeaver"
+        ],
+        "encountered": [
+          "encounteredFirstWeaver"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "hasSilkBomb": false
+        }
+      },
+      "notes": "有 CamLock Battle Intro 和 Outro 演出；出口 door_wakeOnGround。"
+    },
+    {
+      "id": "cogwork_dancers",
+      "name": {
+        "zh": "机枢舞者",
+        "en": "Cogwork Dancers"
+      },
+      "variant": null,
+      "titleKey": "COGWORK_DANCERS",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "COG_CORE",
+        "zh": "机枢核心",
+        "en": "Cogwork <br>Core"
+      },
+      "scene": "Cog_Dancers_boss",
+      "additive": true,
+      "hostScene": "Cog_Dancers",
+      "additiveLoader": {
+        "object": "Boss Loader",
+        "tests": {},
+        "quests": []
+      },
+      "entry": {
+        "scene": "Cog_Dancers"
+      },
+      "arena": {
+        "door": [
+          39.9,
+          5.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Dancer Control",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Boss Scene",
+            "fsm": "Sequence",
+            "state": "Wait"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Dancer A",
+        "Dancer B"
+      ],
+      "hp": {
+        "Dancer A": 300,
+        "Dancer B": 300
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCogworkDancers"
+        ],
+        "encountered": [
+          "encounteredCogworkDancers"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Clockwork Dancer"
+      ],
+      "debug": {
+        "killInterval": 6,
+        "timeout": 150
+      },
+      "notes": "附加场景，加载器没有 PlayerData 条件（由 FSM 控制）。双 Boss。"
+    },
+    {
+      "id": "trobbio",
+      "name": {
+        "zh": "特罗比奥",
+        "en": "Trobbio"
+      },
+      "variant": null,
+      "titleKey": "TROBBIO",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Library_13",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Library_13"
+      },
+      "arena": {
+        "door": [
+          69.5,
+          15.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Grand Stage Scene/Boss Scene Trobbio/Trobbio",
+          "fsm": "Control",
+          "state": "Start Idle"
+        },
+        "end": [
+          {
+            "path": "Grand Stage Scene/Boss Scene Trobbio/Trobbio",
+            "fsm": "Control",
+            "state": "Death Hit"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Trobbio"
+      ],
+      "hp": {
+        "Trobbio": 700
+      },
+      "flags": {
+        "defeated": [
+          "defeatedTrobbio"
+        ],
+        "encountered": [
+          "encounteredTrobbio"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "debug": {
+        "timeout": 150
+      },
+      "notes": "和痛苦的特罗比奥共用 Library_13，靠剧情标记区分出场的是哪个。开战范围有两个（Boss 的 FSM 用 Trigger2dEvent 等玩家进去）：重打用 Start Range（x 62–86.6），初遇和痛苦的特罗比奥用更窄的 Start Range Meet（x 67.8–81.0）。入场门放在两个范围都覆盖的舞台左侧（x 69.5）。舞台音乐（Audio Boss Tension）的大触发区和开战无关；左边幕布后面的高台 (55.2, 18.6) 不在开战范围里，人在那里被前景幕布挡住，Boss 也不出来（2026-11-23 观察测试）。"
+    },
+    {
+      "id": "the_unravelled",
+      "name": {
+        "zh": "失缚怨魂",
+        "en": "The Unravelled"
+      },
+      "variant": null,
+      "titleKey": "WARD_BOSS",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "WARD",
+        "zh": "白愈厅",
+        "en": "Whiteward"
+      },
+      "scene": "Ward_02_boss",
+      "additive": true,
+      "hostScene": "Ward_02",
+      "additiveLoader": {
+        "object": "Boss Loader",
+        "tests": {
+          "TestGroups": [
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "WillLoadWardBoss",
+                  "BoolValue": 1,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            }
+          ]
+        },
+        "quests": []
+      },
+      "entry": {
+        "scene": "Ward_02"
+      },
+      "arena": {
+        "$comment": "原版 Boss Scene::Control 进场后先打尸壳：First Slasher（1 只）→ P2（Slasher 1 + Slammer 1），清完才进 P3、Boss Phase 1 给 Conductor Boss 发 WAKE。神居版改跳转（重打走的 Encountered Start、初见走的 Boss Title，FINISHED 都直接到 P3 Pause），跳过这段前置尸壳；P3 数尸壳用的 Husks 子物体数这时本来就是 4。Boss 出场后的尸壳阶段（Twin Slammers、Enemy Phase）是 Boss 自己的阶段，不动。判胜在 Boss Scene::Control 的 Death Explode（Boss 爆开）：原版之后进 Silk Heart，要玩家捡起丝之心才到 Battle End，0.9.0 冒烟测试判胜写在 Battle End，Boss 打死了也一直没判胜。",
+        "door": [
+          44.0,
+          8.9
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Idle"
+        },
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "from": "Encountered Start",
+            "event": "FINISHED",
+            "to": "P3 Pause"
+          },
+          {
+            "type": "goto",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "from": "Boss Title",
+            "event": "FINISHED",
+            "to": "P3 Pause"
+          }
+        ],
+        "end": [
+          {
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "state": "Death Explode"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Conductor Boss"
+      ],
+      "hp": {
+        "Conductor Boss": 1000
+      },
+      "flags": {
+        "defeated": [
+          "wardBossDefeated"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "wardBossHatchOpened": true
+        }
+      },
+      "journal": [
+        "Conductor Boss"
+      ],
+      "debug": {
+        "$comment": "战斗中的尸壳阶段（Twin Slammers、Enemy Phase）要清完尸壳 Boss 才继续：自检替玩家清（只在自检里用）。尸壳出场时会离开 Husks 文件夹，所以按名字也列上。",
+        "killAdds": [
+          "Boss Scene/Husks",
+          "Slasher 1",
+          "Slasher 2",
+          "Slammer 1",
+          "Slammer 2"
+        ],
+        "timeout": 180,
+        "holdKill": [
+          {
+            "path": "Boss Scene/Conductor Boss",
+            "fsm": "Control",
+            "when": "Dormant|Notify Scene|Notify Scene 2"
+          }
+        ]
+      },
+      "notes": "附加场景，加载条件 WillLoadWardBoss=true。WillLoadWardBoss 是计算属性（!wardBossDefeated && (collectedWardBossKey || wardBossHatchOpened)），所以前置条件改成设 wardBossHatchOpened。有 Head Invuln Check（头部无敌判定）。"
+    },
+    {
+      "id": "second_sentinel",
+      "name": {
+        "zh": "次席戍卫",
+        "en": "Second Sentinel"
+      },
+      "variant": null,
+      "titleKey": "SONG_KNIGHT",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "HANG",
+        "zh": "高庭",
+        "en": "High Halls"
+      },
+      "scene": "Hang_17b",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Hang_17b"
+      },
+      "arena": {
+        "door": [
+          44.5,
+          7.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene - To Additive Load/Song Knight",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Song Knight"
+      ],
+      "hp": {
+        "Song Knight": 800
+      },
+      "flags": {
+        "defeated": [
+          "defeatedSongChevalierBoss"
+        ],
+        "encountered": [
+          "encounteredSongChevalierBoss"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "专用场景 Hang_17b（Boss Scene - To Additive Load）。Hang_07 里也有一个 Song Knight，可能是另一种出场。"
+    },
+    {
+      "id": "lace_2",
+      "name": {
+        "zh": "蕾丝",
+        "en": "Lace"
+      },
+      "variant": {
+        "zh": "高塔之战",
+        "en": "Tower Duel"
+      },
+      "titleKey": "LACE",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "CRADLE",
+        "zh": "摇篮圣所",
+        "en": "The Cradle"
+      },
+      "scene": "Song_Tower_01",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Song_Tower_01"
+      },
+      "arena": {
+        "door": [
+          59.2,
+          102.8
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Lace Boss2 New",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Lace Boss2 New"
+      ],
+      "hp": {
+        "Lace Boss2 New": 800
+      },
+      "flags": {
+        "defeated": [
+          "defeatedLaceTower"
+        ],
+        "encountered": [
+          "encounteredLaceTower"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "statueArt": [
+        "tk2d:laceboss/Lace Cln/lace_engarde0000"
+      ],
+      "notes": "蕾丝之塔。打完接丝之心记忆和过场（door_cutsceneEndLaceTower / door_cinematicEnd），必须拦截。"
+    },
+    {
+      "id": "grand_mother_silk",
+      "name": {
+        "zh": "崇高圣母灵丝",
+        "en": "Grand Mother Silk"
+      },
+      "variant": null,
+      "titleKey": "SILK",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "CRADLE",
+        "zh": "摇篮圣所",
+        "en": "The Cradle"
+      },
+      "scene": "Cradle_03",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Cradle_03"
+      },
+      "arena": {
+        "$comment": "不跳过挑战：入场门在原版的挑战区（Challenge Region，提示“挑战”）里，玩家按交互键挑战后才开打（你要求的）。开战判定看 Intro Sequence 的 First Challenge：Idle 收到挑战区发的 CHALLENGE START 才走（挑战区自己的 Idle → In Region 只是人进了区）。崇高圣母灵丝是特殊死亡：Phase Control 打到 Death Hit 进死亡动画和结局，在 Death Hit 插结束。",
+        "door": [
+          42.2,
+          134.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Intro Sequence",
+          "fsm": "First Challenge",
+          "state": "Idle"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Silk Boss",
+            "fsm": "Phase Control",
+            "state": "Death Hit"
+          }
+        ],
+        "keep": [
+          "Boss Scene/Intro Sequence/Challenge Region"
+        ],
+        "challenge": true
+      },
+      "bossObjects": [
+        "Silk Boss"
+      ],
+      "hp": {
+        "Silk Boss": 1204
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": [
+          "encounteredSilk"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Silk Boss"
+      ],
+      "debug": {
+        "timeout": 240,
+        "react": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Intro Sequence/Challenge Region",
+            "fsm": "Challenge",
+            "when": "In Region",
+            "after": 1.5,
+            "event": "INTERACT"
+          },
+          {
+            "type": "event",
+            "path": "Boss Scene/Silk Boss",
+            "fsm": "Control",
+            "when": "Drift F",
+            "after": 3,
+            "event": "FINISHED"
+          }
+        ]
+      },
+      "notes": "第二幕结局 Boss。打完进结局动画，必须拦截结局/存档流程。"
+    },
+    {
+      "id": "garmond_zaza",
+      "name": {
+        "zh": "加蒙德 & 扎扎",
+        "en": "Garmond And Zaza"
+      },
+      "variant": null,
+      "titleKey": "GARMOND",
+      "tier": "spar",
+      "act": 2,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Library_09",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Library_09"
+      },
+      "arena": {
+        "$comment": "原版：人进 Start Range，Garmond Scene 的 Control 给加蒙德发 CITADEL CHARGE（冲进来 → Cit WalkTo → Cit NPC 变成对话 NPC），玩家答应切磋后 NPC 发 BATTLE START（Setup 1 设 Hero Battle、圈场地 → 吼叫 → Idle → 打）。门在 Start Range 里：加载那一刻场景控制就收到进入、发了 CITADEL CHARGE，加蒙德还在 Wait Hero In Position，事件丢了（0.9.0 全量自检停在 Dormant）。神居版进场后等它到 Dormant 再发一次 CITADEL CHARGE（原版同一个事件），到 Cit NPC 替玩家答应切磋（BATTLE START）。Quick Fight 那条是它和别的敌人打（Auto Target），不是和玩家打，不用。加蒙德的 FSM 用模板，结束动作靠模板 FSM 醒来后重插（Arena.OnFsmAwake）。",
+        "door": [
+          73.8,
+          16.7
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Black Thread States/Normal World/Scene Control/Garmond Scene/Garmond Fighter",
+          "fsm": "Control",
+          "state": "Cit NPC"
+        },
+        "enter": [
+          {
+            "type": "event",
+            "path": "Black Thread States/Normal World/Scene Control/Garmond Scene/Garmond Fighter",
+            "fsm": "Control",
+            "when": "Dormant",
+            "event": "CITADEL CHARGE"
+          },
+          {
+            "type": "event",
+            "path": "Black Thread States/Normal World/Scene Control/Garmond Scene/Garmond Fighter",
+            "fsm": "Control",
+            "when": "Cit NPC",
+            "event": "BATTLE START"
+          }
+        ],
+        "end": [
+          {
+            "path": "Black Thread States/Normal World/Scene Control/Garmond Scene/Garmond Fighter",
+            "fsm": "Control",
+            "state": "Death Hit"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Garmond Fighter"
+      ],
+      "hp": {
+        "Garmond Fighter": 460
+      },
+      "flags": {
+        "defeated": [
+          "garmondWillAidInForumBattle"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": false,
+          "garmondInLibrary": true,
+          "garmondWillAidInForumBattle": false,
+          "garmondInEnclave": false,
+          "garmondLibrarySeen": false
+        }
+      },
+      "journal": [
+        "Garmond_Zaza"
+      ],
+      "notes": "切磋战（NPC），标记名的意思是“加蒙德打赢了大黄蜂”，胜负条件和普通 Boss 不同，阶段 1 单独处理。"
+    },
+    {
+      "id": "cogwork_clapper",
+      "name": {
+        "zh": "机枢击钹者",
+        "en": "Cogwork Clapper"
+      },
+      "variant": null,
+      "titleKey": null,
+      "tier": "mini",
+      "act": 2,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Cog_07",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Cog_07"
+      },
+      "arena": {
+        "$comment": "整个 Battle Scene Test/Battle Scene 由 TestGameObjectActivator 管：blackThreadWorld 为真（第三幕）才激活，所以前置条件临时设 blackThreadWorld=true（0.9.0 全量自检：两只自鸣球都没激活）。 Battle Scene 的触发区是多边形，顶点 (38.6,68.4) (27.5,92.0) (18.4,68.6) (23.6,68.7) (28.0,78.2) (32.5,68.8)：底部中间开了倒 V 口，地面那一层只有 x≈19.3–24.7 和 31.5–37.4 两段在里面；门放在左边那段（原来的 x=12.3 在外面，BattleScene 不开战）。",
+        "door": [
+          21.5,
+          72.0
+        ],
+        "face": "right",
+        "wake": {
+          "battle": "Battle Scene Test/Battle Scene"
+        }
+      },
+      "bossObjects": [
+        "Song Automaton Ball R",
+        "Song Automaton Ball L"
+      ],
+      "hp": {
+        "Song Automaton Ball R": 190,
+        "Song Automaton Ball L": 190
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": true
+        }
+      },
+      "notes": "小 Boss（无标题卡），三个球体（190/190/145）。"
+    },
+    {
+      "id": "shakra",
+      "name": {
+        "zh": "沙克拉",
+        "en": "Shakra"
+      },
+      "variant": null,
+      "titleKey": "MAPPER",
+      "tier": "spar",
+      "act": 2,
+      "region": {
+        "key": "GREYMOOR",
+        "zh": "灰沼",
+        "en": "Greymoor"
+      },
+      "scene": "Greymoor_08_mapper",
+      "additive": true,
+      "hostScene": "Greymoor_08",
+      "additiveLoader": {
+        "object": "Mapper Sparring Scene Loader",
+        "tests": {
+          "TestGroups": [
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "blackThreadWorld",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            }
+          ]
+        },
+        "quests": [
+          {
+            "CheckAvailable": 0,
+            "IsAvailable": 0,
+            "CheckAccepted": 0,
+            "IsAccepted": 0,
+            "CheckCompletedAmount": 0,
+            "CompletedAmount": 0,
+            "CheckCompletable": 0,
+            "IsCompletable": 0,
+            "CheckCompleted": 1,
+            "IsCompleted": 1,
+            "CheckWasEverCompleted": 0,
+            "WasEverCompleted": 0
+          }
+        ]
+      },
+      "entry": {
+        "scene": "Greymoor_08"
+      },
+      "arena": {
+        "$comment": "沙克拉开局“不在”：Dialogue 的 Init 做完进 Start Away，给 Attack Enemies 发 START AWAY 把她藏起来，原版要玩家响铃（MAPPER CALL）她才瞬移过来；到场时人在场地里（Tele Range Hero Low 从 x=12.1 起）她就当同伴帮打敌人，人在左出口那边才 GO HOME 回 Idle、能切磋。补丁让 Dialogue 的 Init 做完直接进 Idle，她一直在家 (33.3, 5.7) 待着，进场后 Idle 时发 BATTLE HERO 开始切磋。门放在这场的非致命复活点 Death Respawn Marker NonLethal (37.4, 5.1)。原来的门在左出口 left2 的复活点 (8.5, 7.0)：她冲锋穿过人冲到 x≈1（镜头锁定区从 x=7 开始），之后一直停在 Charge Recover、不在画面里，自检的人不动，打不到她（0.9.0 跑了 5 次，2 次这样）。Greymoor_08 的 Boss Scene Loader 在 visitedBellhart、defeatedVampireGnatBoss、VampireGnatBossInAltLoc 都是 false 时加载 Greymoor_08_boss（荒沼翼主的备用地点），神居存档满足；荒沼翼主飞进她的 Enemy Range，Attack Enemies 的 Idle 收到 ENEMY（Trigger2dEvent 存下的 Target Enemy 是 Greymoor_08_boss 的 Vampire Gnat）进 Battle Cry Start 去打它（同伴模式），不是 BATTLE HERO 的切磋，人还没进场她就开打了（0.9.0 按审查修正后的完整 50 个和之后单跑 3 次都是这样，后 2 次日志记下了 ENEMY 和 Target Enemy；之前连跑 3 次没出现，推测是荒沼翼主当时没飞进范围）。noAdditive 让这一场不加载 Greymoor_08_boss。wake.via 只认经 BATTLE HERO 离开 Idle 才算开战，ENEMY（去打别的敌人）不算。",
+        "door": [
+          37.4,
+          7.0
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Mapper Spar NPC",
+          "fsm": "Attack Enemies",
+          "state": "Idle",
+          "via": "BATTLE HERO"
+        },
+        "end": [
+          {
+            "path": "Mapper Spar NPC",
+            "fsm": "Attack Enemies",
+            "state": "Defeat Start"
+          }
+        ],
+        "enter": [
+          {
+            "type": "event",
+            "path": "Mapper Spar NPC",
+            "fsm": "Attack Enemies",
+            "event": "BATTLE HERO",
+            "when": "Idle"
+          }
+        ],
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Mapper Spar NPC",
+            "fsm": "Dialogue",
+            "from": "Init",
+            "event": "FINISHED",
+            "to": "Idle"
+          }
+        ],
+        "noAdditive": [
+          "Greymoor_08_boss"
+        ]
+      },
+      "bossObjects": [
+        "Mapper Spar NPC"
+      ],
+      "hp": {
+        "Mapper Spar NPC": 600
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Shakra"
+      ],
+      "notes": "沙克拉切磋战，附加场景。具体触发条件待查。"
+    },
+    {
+      "id": "clover_dancers",
+      "name": {
+        "zh": "三叶草舞者",
+        "en": "Clover Dancers"
+      },
+      "variant": null,
+      "titleKey": "CLOVER_DANCERS",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "CLOVER",
+        "zh": "翠庭",
+        "en": "Verdania"
+      },
+      "scene": "Clover_10",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Clover_10"
+      },
+      "arena": {
+        "$comment": "门放进 Enter Detector（x 83.8–92.7，y 36–50）；Dancer Control 在 Dormant 等 BATTLE START。",
+        "door": [
+          85.0,
+          39.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Dancer Control",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Dancer Control/Dancer A",
+            "fsm": "Control",
+            "state": "Stun Stagger"
+          },
+          {
+            "path": "Boss Scene/Dancer Control/Dancer B",
+            "fsm": "Control",
+            "state": "Stun Stagger"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Dancer A",
+        "Dancer B"
+      ],
+      "hp": {
+        "Dancer A": 300,
+        "Dancer B": 300
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCloverDancers"
+        ],
+        "encountered": [
+          "encounteredCloverDancers"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "encounteredCloverDancers": true
+        }
+      },
+      "journal": [
+        "Clover Dancer"
+      ],
+      "debug": {
+        "killInterval": 6,
+        "timeout": 150
+      },
+      "notes": "失落的翠庭。场景里有绿王子 NPC 对话。双 Boss。"
+    },
+    {
+      "id": "palestag",
+      "name": {
+        "zh": "苍白苜鹿",
+        "en": "Palestag"
+      },
+      "variant": null,
+      "titleKey": "WHITE_CLOVERSTAG",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "CLOVER",
+        "zh": "翠庭",
+        "en": "Verdania"
+      },
+      "scene": "Clover_19",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Clover_19"
+      },
+      "arena": {
+        "door": [
+          31.1,
+          18.1
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Cloverstag White Boss",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Cloverstag White Boss"
+      ],
+      "hp": {
+        "Cloverstag White Boss": 480
+      },
+      "flags": {
+        "defeated": [
+          "defeatedWhiteCloverstag"
+        ],
+        "encountered": [
+          "encounteredWhiteCloverstag"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": ""
+    },
+    {
+      "id": "nyleth",
+      "name": {
+        "zh": "尼莱斯",
+        "en": "Nyleth"
+      },
+      "variant": null,
+      "titleKey": "FLOWER_QUEEN",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "MEMORY",
+        "zh": "忆境",
+        "en": "Memory"
+      },
+      "scene": "Shellwood_11b_Memory",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Shellwood_11b_Memory"
+      },
+      "arena": {
+        "$comment": "门放进 Boss Scene 的 Enter Range（x 6.7–23，y 106.8–120.6）；Terrain Intro 的碰撞体在 (18.5, 107.5)，人站在它上面。 补丁：Boss Scene 的 Enter 1 做完（FINISHED）直接进 Scream，不在 Enter 2 等玩家弹奏或往回走。",
+        "door": [
+          18.0,
+          109.5
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Unencountered"
+        },
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "from": "Enter 1",
+            "event": "FINISHED",
+            "to": "Scream"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Flower Queen Boss"
+      ],
+      "hp": {
+        "Flower Queen Boss": 1250
+      },
+      "flags": {
+        "defeated": [
+          "defeatedFlowerQueen"
+        ],
+        "encountered": [
+          "encounteredFlowerQueen"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Flower Queen"
+      ],
+      "notes": "记忆场景（入口 door_wakeInMemory），需要按记忆场景的方式进入和退出。"
+    },
+    {
+      "id": "crust_king_khann",
+      "name": {
+        "zh": "壳王卡汗",
+        "en": "Crust King Khann"
+      },
+      "variant": null,
+      "titleKey": "CORAL_KING",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "MEMORY",
+        "zh": "忆境",
+        "en": "Memory"
+      },
+      "scene": "Memory_Coral_Tower",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Memory_Coral_Tower"
+      },
+      "arena": {
+        "door": [
+          50.6,
+          558.1
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene",
+          "fsm": "Control",
+          "state": "Ready"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Coral King",
+            "fsm": "Control",
+            "state": "Heart Death Start"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Coral King"
+      ],
+      "hp": {
+        "Coral King": 1650
+      },
+      "flags": {
+        "defeated": [
+          "defeatedCoralKing"
+        ],
+        "encountered": [
+          "encounteredCoralKing"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": "记忆场景。原版 Boss 前有 4 个房间的杂兵战（珊瑚尖塔），神居版入场门直接在 Boss 房，不经过那 4 个房间（见 docs/arena.md 1.8）。场景 46MB，加载慢。"
+    },
+    {
+      "id": "karmelita",
+      "name": {
+        "zh": "斯卡尔歌后卡梅莉塔",
+        "en": "Skarrsinger Karmelita"
+      },
+      "variant": null,
+      "titleKey": "HUNTER_QUEEN",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "MEMORY",
+        "zh": "忆境",
+        "en": "Memory"
+      },
+      "scene": "Memory_Ant_Queen",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Memory_Ant_Queen"
+      },
+      "arena": {
+        "$comment": "原版卡梅莉塔吼完进 Battle Dance：调 Boss Scene/Battle Scene 的 StartBattle，让 4 波猎手小怪先打（最后一波是两只 Bone Hunter Fly Chief），自己在背景跳舞，收到 BATTLE END 才下场（Launch In Antic）。神居版改跳转（Battle Roar End 的 FINISHED 直接到 Launch In Antic），跳过猎手波次；Battle Dance 里只有开战和换音乐，Launch In Antic 自己会换 Boss 战音乐。不跳过挑战（和崇高圣母灵丝一样）：卡梅莉塔在背景跳舞（BG Dance），等挑战区 Challenge Region 发 CHALLENGE 才吼叫下场。保留挑战区（keep），入场门在挑战区上方，玩家按交互键挑战后才开打；自检替玩家按（debug.react）。0.9.0 冒烟测试时挑战区被当成交互物体关掉了，她一直停在 BG Dance。",
+        "door": [
+          149.0,
+          21.1
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Hunter Queen Boss",
+          "fsm": "Control",
+          "state": "BG Dance"
+        },
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Boss Scene/Hunter Queen Boss",
+            "fsm": "Control",
+            "from": "Battle Roar End",
+            "event": "FINISHED",
+            "to": "Launch In Antic"
+          }
+        ],
+        "keep": [
+          "Boss Scene/Challenge Region"
+        ],
+        "challenge": true
+      },
+      "bossObjects": [
+        "Hunter Queen Boss"
+      ],
+      "hp": {
+        "Hunter Queen Boss": 1500
+      },
+      "flags": {
+        "defeated": [
+          "defeatedAntQueen"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "debug": {
+        "$comment": "替玩家在挑战区里按交互键（只在自检里用）。",
+        "react": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Challenge Region",
+            "fsm": "Challenge",
+            "when": "In Region",
+            "after": 1.5,
+            "event": "INTERACT"
+          }
+        ]
+      },
+      "notes": "记忆场景。原版卡梅莉塔下场前有 4 波猎手小怪，神居版跳过（见 arena.$comment）。"
+    },
+    {
+      "id": "seth",
+      "name": {
+        "zh": "圣所守卫者赛斯",
+        "en": "Shrine Guardian Seth"
+      },
+      "variant": null,
+      "titleKey": "SETH",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "SHELLWOOD_THICKET",
+        "zh": "壳木林",
+        "en": "Shellwood"
+      },
+      "scene": "Shellwood_22",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Shellwood_22"
+      },
+      "arena": {
+        "door": [
+          104.8,
+          10.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Seth",
+          "fsm": "Control",
+          "state": "Idle"
+        }
+      },
+      "bossObjects": [
+        "Seth"
+      ],
+      "hp": {
+        "Seth": 1185
+      },
+      "flags": {
+        "defeated": [
+          "defeatedSeth"
+        ],
+        "encountered": [
+          "encounteredSeth"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "statueArt": [
+        "Seth"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "lost_garmond",
+      "name": {
+        "zh": "失心加蒙德",
+        "en": "Lost Garmond"
+      },
+      "variant": null,
+      "titleKey": "GARMOND_BT",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "JUDGE_STEPS",
+        "zh": "风蚀长阶",
+        "en": "Blasted Steps"
+      },
+      "scene": "Coral_33",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_33"
+      },
+      "arena": {
+        "$comment": "开战判定：Control 的 Dormant 收到 EXIT（人出了 Can Start Range）回 Out of Start Range，那里收到 ENTER 又回 Dormant，两个都是等玩家的状态，所以写 Out of Start Range|Dormant；Dormant 收到 WAKE（人进 Stab Range）或 TOOK DAMAGE 才去 Roar Antic 开战。进场步骤关掉 Pre Garmond、打开加蒙德本体。",
+        "door": [
+          23.7,
+          66.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Black Thread States/Black Thread World/Garmond Scenes/Garmond Black Threaded Scene/Garmond Black Threaded Fighter",
+          "fsm": "Control",
+          "state": "Out of Start Range|Dormant"
+        },
+        "enter": [
+          {
+            "type": "deactivate",
+            "path": "Black Thread States/Black Thread World/Garmond Scenes/Pre Garmond"
+          },
+          {
+            "type": "activate",
+            "path": "Black Thread States/Black Thread World/Garmond Scenes/Garmond Black Threaded Scene/Garmond Black Threaded Fighter"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Garmond Black Threaded Fighter"
+      ],
+      "hp": {
+        "Garmond Black Threaded Fighter": 900
+      },
+      "flags": {
+        "defeated": [
+          "garmondBlackThreadDefeated"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": true
+        }
+      },
+      "journal": [
+        "Garmond"
+      ],
+      "debug": {
+        "react": [
+          {
+            "type": "state",
+            "path": "Black Thread States/Black Thread World/Garmond Scenes/Garmond Black Threaded Scene/Garmond Black Threaded Fighter",
+            "fsm": "Control",
+            "when": "Out of Start Range",
+            "state": "Roar Antic"
+          }
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "plasmified_zango",
+      "name": {
+        "zh": "生质异化的赞戈",
+        "en": "Plasmified Zango"
+      },
+      "variant": null,
+      "titleKey": "BLUE_ASSISTANT",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "CRAWLSPACE",
+        "zh": "沙噬虫道",
+        "en": "Wormways"
+      },
+      "scene": "Crawl_10",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Crawl_10"
+      },
+      "arena": {
+        "door": [
+          16.8,
+          8.0
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Area_States/Infected/Blue Assistant",
+          "fsm": "Control",
+          "state": "Rest"
+        }
+      },
+      "bossObjects": [
+        "Blue Assistant"
+      ],
+      "hp": {
+        "Blue Assistant": 1000
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "blackThreadWorld": true
+        }
+      },
+      "journal": [
+        "Blue Assistant"
+      ],
+      "notes": "击败标记待查（PlayerData 里没有直接对应的 defeated 字段）。"
+    },
+    {
+      "id": "pinstress",
+      "name": {
+        "zh": "针姬",
+        "en": "Pinstress"
+      },
+      "variant": null,
+      "titleKey": "PINSTRESS",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "PEAK",
+        "zh": "雪灵山",
+        "en": "Mount Fay"
+      },
+      "scene": "Peak_07",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Peak_07"
+      },
+      "arena": {
+        "$comment": "加载时补丁让 Pinstress Control 的 Check 发 NO PINSTRESS 时也去 Pinstress（原版自己的状态，激活 Pinstress Scene、关掉 No Pinstress Scene），不走剧情检查；Check 前两个动作先 FindNamedChild 找到这两个物体（直接从 Pause 跳过去变量是空的，场景激活不了）。进场后等 NPC Control 到 Snow Sleep，设到 Accept（原版接受切磋那一步：关交互、进 Battle Start 给 Boss 发 START BATTLE），再关掉睡觉的贴图（NPC Control 的 Set Snow Sleep 已经把 Sleep Sprite SetParent 到场景根上，所以路径就是根上的 Sleep Sprite；原来写在 Pinstress Boss 下面，一直没找到）。",
+        "door": [
+          38.0,
+          87.4
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Pinstress Control/Pinstress Scene/Pinstress Boss",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Pinstress Control/Pinstress Scene/Pinstress Boss",
+            "fsm": "Control",
+            "state": "Set Defeated"
+          }
+        ],
+        "enter": [
+          {
+            "type": "state",
+            "path": "Pinstress Control/Pinstress Scene/Pinstress Boss/NPC",
+            "fsm": "NPC Control",
+            "when": "Snow Sleep",
+            "state": "Accept"
+          },
+          {
+            "type": "deactivate",
+            "path": "Sleep Sprite"
+          }
+        ],
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Pinstress Control",
+            "fsm": "Control",
+            "from": "Check",
+            "event": "NO PINSTRESS",
+            "to": "Pinstress"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Pinstress Boss"
+      ],
+      "hp": {
+        "Pinstress Boss": 910
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Pinstress Boss"
+      ],
+      "notes": "击败标记待查。场景出口很多（8 个），入口选择要实机确认。"
+    },
+    {
+      "id": "watcher_at_the_edge",
+      "name": {
+        "zh": "边陲守望者",
+        "en": "Watcher at the Edge"
+      },
+      "variant": null,
+      "titleKey": "GREY_CORAL_WARRIOR",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "CORAL_CAVERNS",
+        "zh": "卡拉卡沙川",
+        "en": "Sands of Karak"
+      },
+      "scene": "Coral_39",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Coral_39"
+      },
+      "arena": {
+        "$comment": "flags.encountered 设 wokeGreyWarrior：醒过的守望者走重打分支 Refight Ready，Close Range 发 WAKE 开战。Refight Ready 先把自己往右平移 15（Translate x=15），Close Range（平移前 x 118.6–133.6，y -2.1–12.2）跟着到 x 133.6–148.6；地面在 y≈7.4（尸体标记 y 8.1），门放在平移后的范围里、地面上方。原来的门 (126.1, 5.0) 在地面以下。",
+        "door": [
+          137.0,
+          9.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Coral Warrior Grey",
+          "fsm": "Control",
+          "state": "Refight Ready"
+        }
+      },
+      "bossObjects": [
+        "Coral Warrior Grey"
+      ],
+      "hp": {
+        "Coral Warrior Grey": 900
+      },
+      "flags": {
+        "defeated": [
+          "defeatedGreyWarrior"
+        ],
+        "encountered": [
+          "wokeGreyWarrior"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": ""
+    },
+    {
+      "id": "bell_eater",
+      "name": {
+        "zh": "噬钟者",
+        "en": "Bell Eater"
+      },
+      "variant": null,
+      "titleKey": "BIG_CENTIPEDE",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "BELLTOWN",
+        "zh": "钟心镇",
+        "en": "Bellhart"
+      },
+      "scene": "Bellway_Centipede_Arena",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Bellway_Centipede_Arena"
+      },
+      "arena": {
+        "$comment": "门放进 Start Range（x 140.2–153.4，y 3.1–23.1）；Centipede Control 在 Dormant 等 ENTER，头尾都离场后进 Wait For Both Left 收尾。",
+        "door": [
+          146.5,
+          8.0
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Centipede Control",
+          "fsm": "Control",
+          "state": "Dormant"
+        },
+        "end": [
+          {
+            "path": "Boss Scene/Centipede Control",
+            "fsm": "Control",
+            "state": "Wait For Both Left"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Giant Centipede Head",
+        "Giant Centipede Butt"
+      ],
+      "hp": {
+        "Giant Centipede Head": 400,
+        "Giant Centipede Butt": 400
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "journal": [
+        "Giant Centipede"
+      ],
+      "notes": "出口是动态门 [dynamic]:door_centipedeExit，体节 Coil 是 hp 10000 的不可击杀部件。击败标记待查。"
+    },
+    {
+      "id": "summoned_saviour",
+      "name": {
+        "zh": "蒙召救主",
+        "en": "Summoned Saviour"
+      },
+      "variant": null,
+      "titleKey": "ABYSS_MASS",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "PATH_OF_BONE",
+        "zh": "髓骨洞窟",
+        "en": "The Marrow"
+      },
+      "scene": "Bone_Steel_Servant",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Bone_Steel_Servant"
+      },
+      "arena": {
+        "$comment": "门放进 Start Range（x 17.5–30.9，y 1.8–19.9）。补丁：Init 的 COMPLETED（任务已完成）也回 Idle；Idle 收到 ENTER 直接进 Summon Start，跳过 Capture 的对话。",
+        "door": [
+          26.5,
+          6.5
+        ],
+        "face": "left",
+        "wake": {
+          "path": "Steel Servant Scene",
+          "fsm": "Control",
+          "state": "Idle"
+        },
+        "patch": [
+          {
+            "type": "goto",
+            "path": "Steel Servant Scene",
+            "fsm": "Control",
+            "from": "Idle",
+            "event": "ENTER",
+            "to": "Summon Start"
+          },
+          {
+            "type": "goto",
+            "path": "Steel Servant Scene",
+            "fsm": "Control",
+            "from": "Init",
+            "event": "COMPLETED",
+            "to": "Idle"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Abyss Mass"
+      ],
+      "hp": {
+        "Abyss Mass": 500
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": [
+          "EncounteredSummonedSaviour"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "notes": ""
+    },
+    {
+      "id": "tormented_trobbio",
+      "name": {
+        "zh": "痛苦的特罗比奥",
+        "en": "Tormented Trobbio"
+      },
+      "variant": null,
+      "titleKey": "TORMENTED_TROBBIO",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Library_13",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Library_13"
+      },
+      "arena": {
+        "door": [
+          69.5,
+          15.6
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Grand Stage Scene/Boss Scene TormentedTrobbio/Tormented Trobbio",
+          "fsm": "Control",
+          "state": "Wait"
+        },
+        "enter": [
+          {
+            "type": "deactivate",
+            "path": "Grand Stage Scene/Boss Scene Trobbio"
+          },
+          {
+            "type": "deactivate",
+            "path": "Grand Stage Scene/First_Stage"
+          },
+          {
+            "type": "deactivate",
+            "path": "Grand Stage Scene/Second_Stage"
+          },
+          {
+            "type": "state",
+            "path": "Grand Stage Scene",
+            "fsm": "Control",
+            "state": "Trobbio Ready 2"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Tormented Trobbio"
+      ],
+      "hp": {
+        "Tormented Trobbio": 950
+      },
+      "flags": {
+        "defeated": [
+          "defeatedTormentedTrobbio"
+        ],
+        "encountered": [
+          "encounteredTormentedTrobbio"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "defeatedTrobbio": true
+        }
+      },
+      "journal": [
+        "Tormented Trobbio"
+      ],
+      "debug": {
+        "timeout": 150
+      },
+      "notes": "和特罗比奥共用 Library_13。舞台控制（Grand Stage Scene::Control）按 blackThreadWorld 分第二幕 / 第三幕：神居存档是第二幕、defeatedTrobbio=false，会先激活普通特罗比奥，再切到 Trobbio Ready 2 就出两个 Boss。所以开战前 defeatedTrobbio=true（第二幕分支走“已击败”，不叫出普通的），关掉普通的 Boss 场景、第二幕舞台（First_Stage）和第三幕准备中的舞台（Second_Stage），只留 Trobbio Ready 2 打开的重演舞台（Third_Stage_refight）。入场门见特罗比奥：痛苦的特罗比奥只等 Start Range Meet（x 67.8–81.0），人站在 x 63.9 时 Boss 一直停在地板下的 Wait 状态不出来（2026-11-23 追踪）。"
+    },
+    {
+      "id": "skull_tyrant_invasion",
+      "name": {
+        "zh": "颅骨暴君",
+        "en": "Skull Tyrant"
+      },
+      "variant": {
+        "zh": "入侵骸底镇",
+        "en": "Bone Bottom Invasion"
+      },
+      "titleKey": "SKULL_KING",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "BONETOWN",
+        "zh": "骸底镇",
+        "en": "Bone Bottom"
+      },
+      "scene": "Bonetown_boss",
+      "additive": true,
+      "hostScene": "Bonetown",
+      "additiveLoader": {
+        "object": "Boss Loader",
+        "tests": {
+          "TestGroups": [
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "skullKingKilled",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                },
+                {
+                  "Type": 0,
+                  "FieldName": "skullKingWillInvade",
+                  "BoolValue": 1,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                },
+                {
+                  "Type": 0,
+                  "FieldName": "blackThreadWorld",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            },
+            {
+              "Tests": [
+                {
+                  "Type": 0,
+                  "FieldName": "skullKingKilled",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                },
+                {
+                  "Type": 0,
+                  "FieldName": "skullKingInvaded",
+                  "BoolValue": 1,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                },
+                {
+                  "Type": 0,
+                  "FieldName": "blackThreadWorld",
+                  "BoolValue": 0,
+                  "NumType": 0,
+                  "IntValue": 0,
+                  "FloatValue": 0.0,
+                  "StringType": 0
+                }
+              ]
+            }
+          ]
+        },
+        "quests": []
+      },
+      "entry": {
+        "scene": "Bonetown"
+      },
+      "arena": {
+        "$comment": "入侵版在 Invade Ready 等玩家坐椅子（BENCHREST）才出来；进场后替玩家发 BENCHREST。长椅在 (238.8, 6.9)，Boss 从右边冲进来、冲到 x<230 刹车（Charge To），这场的死亡复活点 Death Respawn Marker 在 (235.6, 7.8)，门放在那里。原来的门在右边入口 (312.4, 14.3)，离战斗点 80 多格，人不在 Can Nail Attack Range（半径 22）里，Protect From Below 让它对骨钉免疫。",
+        "door": [
+          235.6,
+          9.0
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene/Skull King",
+          "fsm": "Behaviour",
+          "state": "Invade Ready"
+        },
+        "enter": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Skull King",
+            "fsm": "Behaviour",
+            "when": "Invade Ready",
+            "event": "BENCHREST"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Skull King"
+      ],
+      "hp": {
+        "Skull King": 450
+      },
+      "flags": {
+        "defeated": [
+          "skullKingKilled"
+        ],
+        "encountered": [
+          "EncounteredBonetownBoss"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "skullKingWillInvade": true
+        }
+      },
+      "statueArt": [
+        "tk2d:areabone/Skull King Cln/SK_roar0001"
+      ],
+      "notes": "颅骨暴君入侵骸底镇（附加场景）。加载条件 skullKingKilled=false 且 skullKingWillInvade=true 且 blackThreadWorld=false（另有一组条件）。",
+      "debug": {
+        "$comment": "Behaviour 的 Appear 打开特殊死亡（SetSpecialDeath 1），Roar End 才关；出场途中血打空只发 ZERO HP，进 Die（没有出口）卡住。自检每秒打四分之一血，出场那几秒就能打空，所以出场的几个状态里先不打（0.9.0 第四轮：血 -22 停在 Die）。",
+        "holdKill": [
+          {
+            "path": "Boss Scene/Skull King",
+            "fsm": "Behaviour",
+            "when": "Invade Ready|Rest Frame|Invade Pause|Kill Pilby?|Appear|Charge To|Skid 2|Wake Land|Wake Roar"
+          }
+        ]
+      }
+    },
+    {
+      "id": "moss_mother_duo",
+      "name": {
+        "zh": "苔藓之母",
+        "en": "Moss Mother"
+      },
+      "variant": {
+        "zh": "织巢双生",
+        "en": "Weavenest Pair"
+      },
+      "titleKey": "MOSSBONE_MOTHER",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "WEAVER_SHRINE",
+        "zh": "阿特拉织巢",
+        "en": "Weavenest Atla"
+      },
+      "scene": "Weave_03",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Weave_03"
+      },
+      "arena": {
+        "door": [
+          1.7,
+          29.9
+        ],
+        "face": "right",
+        "wake": {
+          "battle": "Boss Scene"
+        },
+        "patch": [
+          {
+            "type": "start",
+            "path": "Moss Vine Cluster (2)",
+            "fsm": "Control",
+            "state": "Activated"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Mossbone Mother A",
+        "Mossbone Mother B"
+      ],
+      "hp": {
+        "Mossbone Mother A": 350,
+        "Mossbone Mother B": 350
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {}
+      },
+      "statueArt": [
+        "pair:Mossbone Mother"
+      ],
+      "notes": "织巢里的双苔藓之母（各 350）。击败标记待查。"
+    },
+    {
+      "id": "savage_beastfly_2",
+      "name": {
+        "zh": "残暴的兽蝇",
+        "en": "Savage Beastfly"
+      },
+      "variant": {
+        "zh": "远野再临",
+        "en": "Far Fields Return"
+      },
+      "titleKey": "GIANT_BONE_FLYER",
+      "tier": "boss",
+      "act": 2,
+      "region": {
+        "key": "WILDS",
+        "zh": "远野",
+        "en": "Far Fields"
+      },
+      "scene": "Bone_East_08_boss_beastfly",
+      "additive": true,
+      "hostScene": "Bone_East_08",
+      "additiveLoader": {
+        "object": "Boss Beastfly Loader",
+        "tests": {},
+        "quests": [
+          {
+            "CheckAvailable": 0,
+            "IsAvailable": 0,
+            "CheckAccepted": 1,
+            "IsAccepted": 1,
+            "CheckCompletedAmount": 0,
+            "CompletedAmount": 0,
+            "CheckCompletable": 1,
+            "IsCompletable": 0,
+            "CheckCompleted": 1,
+            "IsCompleted": 0,
+            "CheckWasEverCompleted": 0,
+            "WasEverCompleted": 0
+          }
+        ]
+      },
+      "entry": {
+        "scene": "Bone_East_08"
+      },
+      "arena": {
+        "$comment": "$Rematch 默认为真，Rematch Ready 等 Wake Range，落点就在里面，只停一帧。宿主场景 Bone_East_08 的 Boss Scene 是第四圣咏团的战斗，defeatedSongGolem 为假会在 Start Range 被唤醒（开墙、镜头锁），所以前置条件设 defeatedSongGolem=true，让它走 Defeated 分支。",
+        "door": [
+          81.0,
+          15.8
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Scene Beastfly/Beastfly States/Active/Bone Flyer Giant",
+          "fsm": "Control",
+          "state": "Rematch Ready"
+        }
+      },
+      "bossObjects": [
+        "Bone Flyer Giant"
+      ],
+      "hp": {
+        "Bone Flyer Giant": 650
+      },
+      "flags": {
+        "defeated": [
+          "defeatedBoneFlyerGiantGolemScene"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "defeatedSongGolem": true
+        }
+      },
+      "journal": [
+        "Bone Flyer Giant"
+      ],
+      "statueArt": [
+        "tk2d:areabone/Bone Flyer Giant Cln/antic_roar0003"
+      ],
+      "notes": "远野的第二次兽蝇战（血量 650），由任务（许愿）控制加载：要求任务已接受、未完成。"
+    },
+    {
+      "id": "huge_flea",
+      "name": {
+        "zh": "巨蚤",
+        "en": "Huge Flea"
+      },
+      "variant": null,
+      "titleKey": null,
+      "tier": "mini",
+      "act": 3,
+      "region": {
+        "key": "CITY_OF_SONG",
+        "zh": "圣堡",
+        "en": "The Citadel"
+      },
+      "scene": "Arborium_08",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Arborium_08"
+      },
+      "arena": {
+        "door": [
+          33.7,
+          34.5
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Giant Flea Scene/Giant Flea",
+          "fsm": "Control",
+          "state": "Idle"
+        },
+        "end": [
+          {
+            "path": "Giant Flea Scene/Giant Flea",
+            "fsm": "Control",
+            "state": "Stun"
+          }
+        ],
+        "enter": [
+          {
+            "type": "activate",
+            "path": "Giant Flea Scene/Giant Flea"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Giant Flea"
+      ],
+      "hp": {
+        "Giant Flea": 200
+      },
+      "flags": {
+        "defeated": [
+          "tamedGiantFlea"
+        ],
+        "encountered": []
+      },
+      "prerequisites": {
+        "playerData": {
+          "uncagedGiantFlea": false,
+          "tamedGiantFlea": false
+        }
+      },
+      "journal": [
+        "Giant Flea"
+      ],
+      "notes": "小 Boss（无标题卡）。"
+    },
+    {
+      "id": "lost_lace",
+      "name": {
+        "zh": "失心蕾丝",
+        "en": "Lost Lace"
+      },
+      "variant": null,
+      "titleKey": "LOST_LACE",
+      "tier": "boss",
+      "act": 3,
+      "region": {
+        "key": "ABYSS",
+        "zh": "深渊",
+        "en": "The Abyss"
+      },
+      "scene": "Abyss_Cocoon",
+      "additive": false,
+      "hostScene": null,
+      "additiveLoader": null,
+      "entry": {
+        "scene": "Abyss_Cocoon"
+      },
+      "arena": {
+        "$comment": "门放进 Intro Control 的 Start Range（x 38.7–59.8，y 3.6–32.7）；开战看 Intro Control 离开 Idle，之后的开场演出约 19 秒。",
+        "door": [
+          46.0,
+          8.0
+        ],
+        "face": "right",
+        "wake": {
+          "path": "Boss Control/Intro Control",
+          "fsm": "Control",
+          "state": "Idle"
+        },
+        "end": [
+          {
+            "path": "Boss Control/Lost Lace Boss",
+            "fsm": "Death Control",
+            "state": "Can Die?"
+          }
+        ]
+      },
+      "bossObjects": [
+        "Lost Lace Boss"
+      ],
+      "hp": {
+        "Lost Lace Boss": 1800
+      },
+      "flags": {
+        "defeated": [],
+        "encountered": [
+          "EncounteredLostLace"
+        ]
+      },
+      "prerequisites": {
+        "playerData": {
+          "EncounteredLostLace": false
+        }
+      },
+      "journal": [
+        "Lost Lace"
+      ],
+      "notes": "第三幕最终 Boss。场景出口只有自指的 door_entry / door_test，打完进结局。必须完整接管进出流程。"
+    }
+  ]
+}

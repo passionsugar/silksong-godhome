@@ -1,0 +1,27 @@
+# 反编译代码和导出的游戏数据：只在本地查阅，不进 git
+reference/
+# 存档备份
+backups/
+# 下载的第三方文件和工具
+tools/downloads/
+tools/ilspycmd-*/
+tools/*.nupkg
+tools/dotnet-install.ps1
+# 构建产物
+**/bin/
+**/obj/
+**/thunderstore/dist/
+**/thunderstore/temp/
+src/**/SilksongPath.props
+# 其他
+__pycache__/
+*.pyc
+*.log
+.vs/
+.idea/
+# 归档的插件构建（第一版 0.2.11 等）
+builds/
+# 临时调试脚本
+scratch/
+# 本机的路径（见 scripts/env.ps1）
+scripts/env.local.ps1

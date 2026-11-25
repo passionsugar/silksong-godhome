@@ -1,0 +1,24 @@
+{
+  "_说明": "前作神居（分支 hk1-godhome）：手办屋的 36 尊前作雕像放本作的 Boss。bosses.json 的雕像表是 43 尊，这里把同一地区、同一类的 7 对并到一尊上（拉杆依次切换，照前作的变体雕像），正好 36 尊。前作的皮鬼雕像（藏在墙后）放巨蚤，辐光雕像（最高处）放崇高圣母灵丝；其余按幕和表里的顺序，先下层从左到右，再上层从左到右。",
+  "_note": "HK1 Godhome (branch hk1-godhome): Silksong bosses on the 36 Hall of Gods statues. bosses.json has 43 statues; 7 pairs from the same region or kind share one statue here (the lever cycles through them, like HK1's alternate statues), which makes 36. The hidden Zote statue holds the Huge Flea and the Radiance statue holds Grand Mother Silk; the rest follow act and table order, lower row left to right, then the upper row.",
+  "merge": {
+    "great_conchflies": ["raging_conchfly"],
+    "cogwork_dancers": ["cogwork_clapper"],
+    "clover_dancers": ["palestag"],
+    "broodmother": ["first_sinner"],
+    "craggler": ["zango"],
+    "bell_beast": ["bell_eater"],
+    "widow": ["father_of_the_flame"]
+  },
+  "special": {
+    "GG_Statue_Zote": "huge_flea",
+    "GG_Statue_Radiance": "grand_mother_silk"
+  },
+  "doors": {
+    "GG_Challenge_Door (1)": "p1",
+    "GG_Challenge_Door (2)": "p2",
+    "GG_Challenge_Door (3)": "p3",
+    "GG_Challenge_Door (4)": "p4",
+    "GG_Final_Challenge_Door": "p5"
+  }
+}
