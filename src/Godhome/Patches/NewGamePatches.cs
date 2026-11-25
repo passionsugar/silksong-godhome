@@ -99,22 +99,51 @@ internal static class ModeTextHasPatch
     }
 }
 
-/// <summary>游戏开神居存档：记一行日志（哪个槽）。</summary>
+/// <summary>
+/// 游戏开神居存档：新建完 PlayerData 后打上神居标记、出生点、满配数值。
+///
+/// 以前挂在 PlayerData.AddGGPlayerDataOverrides 的后缀上。2026-11-25 录宣传片时这个后缀没被调用：
+/// 日志里有“开始新建神居存档”，却没有 SetupNew 的那一行，结果在默认出生点 Tut_01 开了普通新游戏
+/// （2026-11-20 第二版·1 时还是好的）。最可能的原因：那是个空函数，Mono 编译 GameManager.StartNewGame
+/// （DataManager 和我们都给它打了补丁，每打一次重新编译一次）时把它内联了，内联掉的调用不会经过补丁；
+/// 会不会内联取决于补丁打上的先后，所以时好时坏。不再依赖它。
+///
+/// 现在改成 StartNewGame 自己的后缀：StartNewGame 不是小函数，补丁一定生效（前缀的日志一直都在）。
+/// 后缀来得及：神居分支最后一步 StartCoroutine(RunContinueGame())，协程会同步跑到第一个 yield
+/// （fromMenu 默认是 true，第一个 yield 是 WaitForSeconds(1f)），这之前只做淡出和静音，
+/// 读 PlayerData（UpgradeSaveData、respawnScene 等）都在 yield 之后（GameManager.cs:5184-5298）。
+/// </summary>
 [HarmonyPatch(typeof(GameManager), nameof(GameManager.StartNewGame))]
-internal static class StartNewGameLogPatch
+internal static class GodhomeNewSavePatch
 {
-    private static void Prefix(GameManager __instance, bool permadeathMode, bool bossRushMode)
+    /// <summary>记下调用前的 PlayerData：后缀只改 StartNewGame 新建出来的那一份。</summary>
+    private static void Prefix(GameManager __instance, bool bossRushMode, out PlayerData? __state)
     {
+        __state = __instance.playerData;
         if (bossRushMode)
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 开始新建神居存档 / starting a new godhome save in slot {__instance.profileID}");
         }
     }
-}
 
-/// <summary>神居分支新建完 PlayerData 后：打上神居标记、出生点、满配数值。</summary>
-[HarmonyPatch(typeof(PlayerData), nameof(PlayerData.AddGGPlayerDataOverrides))]
-internal static class GodhomeNewSavePatch
-{
-    private static void Postfix(PlayerData __instance) => GodhomeSave.SetupNew(__instance);
+    /// <summary>
+    /// 排在别的插件的后缀前面（Codex 审查）：DataManager 也有 StartNewGame 的后缀，万一它抛异常，后面的后缀就不跑了，
+    /// 而 RunContinueGame 已经启动，会拿没设置过的数据开游戏。
+    /// </summary>
+    [HarmonyPriority(Priority.First)]
+    private static void Postfix(GameManager __instance, bool bossRushMode, PlayerData? __state)
+    {
+        PlayerData? pd = __instance.playerData;
+        if (!bossRushMode || pd == null)
+        {
+            return;
+        }
+        // 原函数被别的补丁跳过时后缀照样会跑（HarmonyX），这时 playerData 还是旧的那份，不能改（Codex 审查）。
+        if (ReferenceEquals(pd, __state))
+        {
+            GodhomePlugin.Log.LogWarning("[Godhome] 开始新游戏没有新建 PlayerData（原函数被跳过了？），不设置神居存档 / StartNewGame created no new PlayerData, not setting up a godhome save");
+            return;
+        }
+        GodhomeSave.SetupNew(pd);
+    }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 
@@ -218,6 +219,125 @@ internal static class AchievementGate
             return false;
         }
         return true;
+    }
+}
+
+/// <summary>
+/// 菜单主题（标题画面的背景风格）存在账号级的共享数据里（MenuStyleUnlock.Unlock → RoamingSharedData），不属于哪个存档。
+/// 神居存档里打 Boss，战斗脚本（MenuStyleUnlockAction、MenuStyleUnlock 组件、GameManager.AwardQueuedAchievements 里排队的）
+/// 会照解锁，玩家没在正经流程里拿到也解开了（审查）。神居存档里一律不解锁、不排队，和成就一样。
+/// </summary>
+[HarmonyPatch(typeof(MenuStyleUnlock), nameof(MenuStyleUnlock.Unlock))]
+internal static class MenuStyleUnlockPatch
+{
+    private static bool Prefix(string key)
+    {
+        if (AchievementGate.Blocking)
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 神居存档里不解锁菜单主题 / menu style not unlocked in a godhome save: {key}");
+            return false;
+        }
+        return true;
+    }
+}
+
+[HarmonyPatch(typeof(GameManager), nameof(GameManager.QueuedMenuStyleUnlock))]
+internal static class QueuedMenuStyleUnlockPatch
+{
+    private static bool Prefix() => !AchievementGate.Blocking;
+}
+
+/// <summary>
+/// GameManager 这一层的发放：先发成就（AchievementHandler 那层已拦），再逐个解锁排队的菜单主题，最后清空队列（反编译 GameManager 2832-2840）。
+/// 解锁被上面拦下了，队列却照样清空：普通存档里排着、还没发的菜单主题就丢了（Codex 复查）。神居存档里整个跳过，队列留给普通存档。
+/// 无参的这个是所有入口（带延迟的重载、读档、过场景、PlayMaker 动作）最后都会走到的。
+/// </summary>
+[HarmonyPatch(typeof(GameManager), nameof(GameManager.AwardQueuedAchievements), new Type[0])]
+internal static class GameManagerAwardQueuedPatch
+{
+    private static bool Prefix() => !AchievementGate.Blocking;
+}
+
+/// <summary>
+/// 钢铁之魂解锁动画（SteelSoulUnlockSequence，结局字幕的 ChainSequence 里的一段）：Begin 里也写 RecPermadeathMode 并保存状态记录，
+/// 不经过 PermadeathUnlock（Codex 复查）。神居存档里让 ShouldShow 为 false，ChainSequence 就跳过这段、不调 Begin（反编译 ChainSequence 137）。
+/// ShouldShow 是虚属性，通过虚调用进来，不会被内联。
+/// </summary>
+[HarmonyPatch(typeof(SteelSoulUnlockSequence), nameof(SteelSoulUnlockSequence.ShouldShow), MethodType.Getter)]
+internal static class SteelSoulUnlockSequencePatch
+{
+    private static void Postfix(ref bool __result)
+    {
+        if (__result && AchievementGate.Blocking)
+        {
+            GodhomePlugin.Log.LogInfo("[Godhome] 神居存档里跳过钢铁之魂解锁动画 / steel soul unlock sequence skipped in a godhome save");
+            __result = false;
+        }
+    }
+}
+
+/// <summary>
+/// 上面的 ShouldShow 只拦得住 ChainSequence 直接放它的情况：包在 FadeSequence 里时，外层 Begin 无条件调它的 Begin（反编译 FadeSequence 61），
+/// 不看 ShouldShow（Codex 终审）。所以 Begin 也守着：动画照放，放完把它写的 RecPermadeathMode 改回原值、再存一次状态记录。
+/// Begin 是虚方法，通过虚调用进来，不会被内联；它里面的 SetStatusRecordInt 可能被内联，所以不拦那个、在这里改回。
+/// </summary>
+[HarmonyPatch(typeof(SteelSoulUnlockSequence), nameof(SteelSoulUnlockSequence.Begin))]
+internal static class SteelSoulUnlockBeginPatch
+{
+    private const string Key = "RecPermadeathMode";
+
+    private static void Prefix(out int __state)
+    {
+        __state = AchievementGate.Blocking && GameManager.UnsafeInstance is GameManager gm ? gm.GetStatusRecordInt(Key) : -1;
+    }
+
+    private static void Postfix(int __state)
+    {
+        if (__state < 0 || GameManager.UnsafeInstance is not GameManager gm || gm.GetStatusRecordInt(Key) == __state)
+        {
+            return;
+        }
+        gm.SetStatusRecordInt(Key, __state);
+        gm.SaveStatusRecords();
+        GodhomePlugin.Log.LogInfo($"[Godhome] 神居存档里不解锁钢铁之魂模式（解锁动画写的记录已改回）/ steel soul unlock reverted in a godhome save ({Key} = {__state})");
+    }
+}
+
+/// <summary>
+/// 钢铁之魂模式的解锁（PermadeathUnlock：通关字幕场景里的组件，Start 里写账号级的状态记录 RecPermadeathMode）。
+/// 神居存档里如果一路走到字幕（结局动画、前作神居结局改道去 End_Credits），不能替所有存档解锁钢铁之魂（审查）。
+/// 挂在 Start 上：Unity 直接调它，不会被内联。
+/// </summary>
+[HarmonyPatch(typeof(PermadeathUnlock), "Start")]
+internal static class PermadeathUnlockPatch
+{
+    private static bool Prefix()
+    {
+        if (AchievementGate.Blocking)
+        {
+            GodhomePlugin.Log.LogInfo("[Godhome] 神居存档里不解锁钢铁之魂模式 / steel soul not unlocked from a godhome save");
+            return false;
+        }
+        return true;
+    }
+}
+
+/// <summary>
+/// 存档被拦下（SaveGuard.BlockAll：战斗中快照丢失、内存里的存档数据只换了一半）时，暂停菜单的“退出到标题”不存档直接退。
+/// 游戏退出前先存档，存档失败又不是强制退出就停在原地（GameManager.ReturnToMainMenu，反编译 5350-5365），
+/// 而拦截又正是要等回标题才解除，玩家就出不去了（审查）。不存档是对的：拦下就是因为内存里的数据不能写进去，盘上的是上一次好的存档。
+/// ReturnToMainMenu 是迭代器方法，前缀在状态机创建之前运行，改参数有效。
+/// </summary>
+[HarmonyPatch(typeof(GameManager), nameof(GameManager.ReturnToMainMenu))]
+internal static class ReturnToMainMenuPatch
+{
+    private static void Prefix(ref bool willSave)
+    {
+        if (willSave && SaveGuard.BlockAll)
+        {
+            GodhomePlugin.Log.LogWarning("[Godhome] 存档被拦下，退出到标题时不存档 / saves are blocked; quitting to the title without saving");
+            willSave = false;
+        }
     }
 }
 

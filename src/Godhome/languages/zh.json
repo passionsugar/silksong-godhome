@@ -51,5 +51,5 @@
     "BIND_DESC_NEEDLE":  "织针束缚：伤害最多 {0}，本来就不超过 {0} 的再减两成",
     "BIND_DESC_MASK":  "面具束缚：最多 {0} 格面具",
     "BIND_DESC_TOOLS":  "工具束缚：所有工具都失去作用",
-    "BIND_DESC_SILK":  "灵丝束缚：丝轴最多 {0} 格"
+    "BIND_DESC_SILK":  "灵丝束缚：灵丝轴最多 {0} 格"
 }

@@ -27,13 +27,14 @@ internal static class SaveGamePatch
         __state = false;
         if (!SaveGuard.BlockAll)
         {
-            if (SaveGuard.Active && withAutoSave)
-            {
-                GodhomePlugin.Log.LogInfo($"[Godhome] 战斗中存档不附带恢复点 / no restore point with this save during a fight ({autoSaveName})");
-                withAutoSave = false;
-            }
             if (SaveGuard.TrySwapIn(__instance, saveSlot, "SaveGame", out __state))
             {
+                // 换入成功、写的是快照时才去掉恢复点：换入失败（例如快照不是这个存档的）时不该动别的存档的恢复点（审查）。
+                if (__state && withAutoSave)
+                {
+                    GodhomePlugin.Log.LogInfo($"[Godhome] 战斗中存档不附带恢复点 / no restore point with this save during a fight ({autoSaveName})");
+                    withAutoSave = false;
+                }
                 return true;
             }
         }
@@ -77,7 +78,9 @@ internal static class CreateRestorePointPatch
             }
             return false;
         }
-        if (SaveGuard.Active)
+        // 快照还是内存里这份数据的才跳过（Codex 复查）：两个数据对象都换了（读了别的档）就照常生成那份存档自己的恢复点，
+        // 只换了一个的交给下面的 TrySwapIn 按失败处理。
+        if (SaveGuard.Active && !SaveGuard.Stale(__instance))
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 战斗中不生成恢复点 / restore point skipped during a fight ({autoSaveName}, slot {saveSlot})");
             callback?.Invoke(true);
@@ -153,7 +156,8 @@ internal static class CreateSaveGameDataPatch
 
 /// <summary>
 /// 前作神居（分支 hk1-godhome）：存档里的复活点不能是前作的场景（没有前作或插件时读档进不去），
-/// 写盘前（PreparePlayerDataForSave，SaveGame / CreateSaveGameData / GetSaveGameData 都经过它，战斗中写的是换进来的快照）
+/// 写盘前（PreparePlayerDataForSave，SaveGame / CreateSaveGameData 经过它；GetSaveGameData 把同样的代码抄了一份、不经过它，
+/// 游戏自己不调 GetSaveGameData，只有别的模组会用。战斗中写的是换进来的快照）
 /// 把前作神居的复活点换回织忆圣所的长椅；读档后落在长椅，有前作就马上转去前厅（ModeController）。
 /// </summary>
 [HarmonyPatch(typeof(GameManager), "PreparePlayerDataForSave")]

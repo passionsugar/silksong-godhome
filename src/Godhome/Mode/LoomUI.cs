@@ -566,6 +566,7 @@ internal sealed class LoomUI : MonoBehaviour
     private bool resultPausePrev;
     private HeroController? resultHero;
     private int resultControl;
+    private bool resultWasRelinquished;
     private float resultSince;
 
     /// <summary>结算开着（大厅的交互要等它）。</summary>
@@ -589,7 +590,13 @@ internal sealed class LoomUI : MonoBehaviour
         resultOpen = true;
         result = r;
         resultSince = Time.unscaledTime;
-        hero.RelinquishControl();
+        // 打开前操作已经在别人手里（例如游戏让大黄蜂坐在长椅上）：不再收一次、关结算时也不替别人交还（审查）。
+        // RelinquishControl 每调一次都会把 ControlVersion 加一，原来拿着操作的那方再交还时版本对不上，就交还不了（Codex 复查）。
+        resultWasRelinquished = hero.controlReqlinquished;
+        if (!resultWasRelinquished)
+        {
+            hero.RelinquishControl();
+        }
         resultHero = hero;
         resultControl = HeroController.ControlVersion;
         resultPd = PlayerData.instance;
@@ -632,7 +639,7 @@ internal sealed class LoomUI : MonoBehaviour
         resultHero = null;
         try
         {
-            if (hero != null && ReferenceEquals(hero, HeroController.instance) && HeroController.ControlVersion == resultControl && hero.controlReqlinquished)
+            if (hero != null && !resultWasRelinquished && ReferenceEquals(hero, HeroController.instance) && HeroController.ControlVersion == resultControl && hero.controlReqlinquished)
             {
                 hero.RegainControl(allowInput: false);
             }
@@ -751,6 +758,11 @@ internal sealed class LoomUI : MonoBehaviour
     {
         // 界面上不画任何文字（名牌、提示条、计时、调试行都去掉了）：只有黑幕和挑战面板。
         float cover = CoverNow();
+        // 暂停时不画黑幕：OnGUI 画在所有 uGUI 画布上面，会把暂停菜单整个盖住（审查）。黑幕本身的计时照旧。
+        if (GameManager.UnsafeInstance is GameManager gm && gm.IsGamePaused())
+        {
+            cover = 0f;
+        }
         bool fallbackPanel = (Challenge != null || DoorChallenge != null) && !nativeOpen;
         bool fallbackResult = resultOpen && !resultNative && result != null;
         if (!fallbackPanel && !fallbackResult && cover <= 0.001f)

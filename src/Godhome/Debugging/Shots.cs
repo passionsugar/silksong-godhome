@@ -19,6 +19,11 @@ internal static class Shots
     /// </summary>
     internal static IEnumerator CaptureWorld(string path, int w = 1440, int h = 810)
     {
+        // 录宣传片时不截图（镜头都画进录像的图里了）。
+        if (PromoRecorder.Recording)
+        {
+            yield break;
+        }
         yield return new WaitForEndOfFrame();
         GameCameras gc = GameCameras.SilentInstance;
         Camera? hud = gc != null ? gc.hudCamera : null;
@@ -104,6 +109,10 @@ internal static class Shots
     /// </summary>
     internal static IEnumerator CaptureWithUi(string path, int w = 1440, int h = 810)
     {
+        if (PromoRecorder.Recording)
+        {
+            yield break;
+        }
         yield return new WaitForEndOfFrame();
         // 上一次没还原的（不该有）先还原。
         RestoreCameras();

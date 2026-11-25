@@ -51,8 +51,8 @@
     },
     {
       "id": "p5",
-      "name": { "zh": "法鲁姆万神殿", "en": "Pantheon of Pharloom" },
-      "desc": { "zh": "法鲁姆的一切记忆，一线不断。", "en": "All of Pharloom's memories, in one unbroken thread." },
+      "name": { "zh": "纺络万神殿", "en": "Pantheon of Pharloom" },
+      "desc": { "zh": "纺络的一切记忆，一线不断。", "en": "All of Pharloom's memories, in one unbroken thread." },
       "emblem": "100_percent",
       "bosses": [
         "moss_mother", "bell_beast", "fourth_chorus", "savage_beastfly", "sister_splinter", "skull_tyrant", "great_conchflies", "moorwing", "widow", "lace_1", "phantom", "last_judge",

@@ -36,9 +36,28 @@ internal static class GodhomeConfig
     internal static ConfigEntry<string> DebugHk1ProbeFsm = null!;
     internal static ConfigEntry<bool> Hk1Enabled = null!;
     internal static ConfigEntry<bool> DebugHk1Tour = null!;
+    internal static ConfigEntry<string> DebugPromo = null!;
+    internal static ConfigEntry<string> DebugPromoOut = null!;
+    internal static ConfigEntry<string> DebugPromoFfmpeg = null!;
+    internal static ConfigEntry<string> DebugPromoBosses = null!;
+    internal static ConfigEntry<float> DebugPromoBotSeconds = null!;
+    internal static ConfigEntry<bool> DebugPromoMuteMusic = null!;
 
     internal static void Bind(ConfigFile cfg)
     {
+        DebugPromo = cfg.Bind("Debug", "Promo", "",
+            "调试用：录宣传片。按顺序跑这些段落（逗号分隔：menu,tools,atrium,hall,fights,pantheon,roof），边跑边把画面（1920×1080，60 帧）和声音录下来。留空 = 关。只在 Debug.Enabled、Safety.EnabledSlots 允许的槽里生效。\n" +
+            "Debug: record promo footage. Runs these segments in order (comma separated: menu,tools,atrium,hall,fights,pantheon,roof) while recording the picture (1920x1080, 60 fps) and the sound. Empty = off. Only with Debug.Enabled on a slot allowed by Safety.EnabledSlots.");
+        DebugPromoOut = cfg.Bind("Debug", "PromoOut", "",
+            "调试用：宣传片录像放在哪个目录。留空 = BepInEx\\Godhome\\promo。\nDebug: folder for the promo recordings. Empty = BepInEx\\Godhome\\promo.");
+        DebugPromoFfmpeg = cfg.Bind("Debug", "PromoFfmpeg", "",
+            "调试用：录像要用的 ffmpeg.exe 的完整路径。找不到就不录。\nDebug: full path of the ffmpeg.exe used for the promo recording. Nothing is recorded without it.");
+        DebugPromoBosses = cfg.Bind("Debug", "PromoBosses", "",
+            "调试用：宣传片 fights 段落依次打的 Boss id（逗号分隔，从各自的雕像开打）。\nDebug: boss ids fought in order by the promo 'fights' segment (comma separated; each started from its statue).");
+        DebugPromoBotSeconds = cfg.Bind("Debug", "PromoBotSeconds", 8f,
+            "调试用：宣传片里每场先让自动操作的大黄蜂真打这么多秒，之后才用调试伤害收尾。\nDebug: in the promo, let the auto-piloted Hornet really fight for this many seconds before the debug damage finishes the boss.");
+        DebugPromoMuteMusic = cfg.Bind("Debug", "PromoMuteMusic", true,
+            "调试用：录宣传片时把游戏音乐调成静音（只在运行时改混音器，不改设置），只录音效。\nDebug: mute the game's music while recording the promo (runtime mixer only, settings untouched), so only sound effects are recorded.");
         DebugHk1Tour = cfg.Bind("Debug", "Hk1Tour", false,
             "调试用：自动读档进前作的神居后巡视一遍（门、挑战界面、开一次万神殿、手办屋的雕像、拉杆、从雕像开一场、走回前厅和屋顶）并截图。\n" +
             "Debug: after the auto-load into Hollow Knight's Godhome, tour it (doors, challenge UIs, one pantheon start, the Hall of Gods statues, a lever, a statue fight, walking back to the atrium and roof) taking screenshots.");

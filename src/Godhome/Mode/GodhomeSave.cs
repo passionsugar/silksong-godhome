@@ -85,7 +85,8 @@ internal static class GodhomeSave
     }
 
     /// <summary>
-    /// 新建神居存档（AddGGPlayerDataOverrides 之后）：打上神居标记、出生点设在大厅长椅、写入满配的数值。
+    /// 新建神居存档（GameManager.StartNewGame 神居分支的后缀，见 NewGamePatches.cs 的 GodhomeNewSavePatch）：
+    /// 打上神居标记、出生点设在大厅长椅、写入满配的数值。
     /// 这时还在标题画面，只改数据；工具和纹章要用到游戏里的管理器，进游戏后（ApplyKit）再解锁。
     /// </summary>
     internal static void SetupNew(PlayerData pd)

@@ -36,6 +36,9 @@ internal static class Hk1Assets
     /// 转场特效只是锦上添花，不能连累前作神居本身（实测：路径写错时前厅也进不去，退回了织忆圣所）。
     /// </summary>
     private static bool holderDropped;
+
+    /// <summary>这份包的载体开始加载过（之后不能再换一份包，见 Locate）。</summary>
+    private static bool holderLoaded;
     private static readonly Dictionary<string, object> requested = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, IResourceLocation> located = new(StringComparer.Ordinal);
 
@@ -135,6 +138,7 @@ internal static class Hk1Assets
         }
         try
         {
+            holderLoaded = true;
             return LoadAsset(transitionsAsset);
         }
         catch (Exception e)
@@ -173,7 +177,10 @@ internal static class Hk1Assets
         {
             string why = $"找不到 {scene} 的位置 / locating {scene} failed: {e.GetBaseException().Message}";
             // 带着载体的那份包失败了（找不到那个物体时整份都失败）：不带它重新打包，再找一次。
-            if (transitionsAsset != null && DropHolder(why) && !Failed && requested.TryGetValue(scene, out object? again))
+            // 只在这份包还什么都没加载过时才行（审查）：已经进过它的场景、加载过载体，再打第二份包，同一批依赖包会加载两次，后面的场景都进不去。
+            // 那种情况（例如万神殿中途才找温泉 GG_Spa）就按失败处理（下面的 Fail）：这一趟的休息点改用本作的长椅，
+            // 已经在前作神居里的前厅照常走；下次进模式时才退回织忆圣所（Codex 复查）。
+            if (transitionsAsset != null && located.Count == 0 && !holderLoaded && DropHolder(why) && !Failed && requested.TryGetValue(scene, out object? again))
             {
                 try
                 {

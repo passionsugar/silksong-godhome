@@ -431,7 +431,13 @@ internal static class Hk1Lobby
                 }
                 else if (a != null && a.GetType().Name == "CallMethodProper" && MethodNameOf(a) == "CanTalk")
                 {
-                    acts[i] = new Hk1CanTalk { Store = pm.FsmVariables.GetFsmBool("Talk Allowed") };
+                    // 结果存到原动作自己的变量里（不是写死的“Talk Allowed”），每帧检查的照样每帧检查（审查）。
+                    string? store = Traverse.Create(a).Field("storeResult").GetValue<FsmVar>()?.variableName;
+                    acts[i] = new Hk1CanTalk
+                    {
+                        Store = pm.FsmVariables.GetFsmBool(string.IsNullOrEmpty(store) ? "Talk Allowed" : store),
+                        EveryFrame = Traverse.Create(a).Field("EveryFrame").GetValue<bool>(),
+                    };
                     changed = true;
                 }
             }
@@ -721,7 +727,21 @@ internal sealed class Hk1CanTalk : FsmStateAction
 {
     public FsmBool? Store;
 
+    /// <summary>原动作勾了 EveryFrame：每帧都重新检查，不结束。</summary>
+    public bool EveryFrame;
+
     public override void OnEnter()
+    {
+        Check();
+        if (!EveryFrame)
+        {
+            Finish();
+        }
+    }
+
+    public override void OnUpdate() => Check();
+
+    private void Check()
     {
         HeroController hero = HeroController.SilentInstance;
         bool ok = hero != null && hero.CanInteract() && !Hk1Lobby.InteractionBlocked;
@@ -729,6 +749,5 @@ internal sealed class Hk1CanTalk : FsmStateAction
         {
             Store.Value = ok;
         }
-        Finish();
     }
 }

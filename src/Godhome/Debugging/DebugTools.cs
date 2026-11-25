@@ -14,7 +14,7 @@ namespace Godhome;
 /// [Godhome] 调试功能（Debug.Enabled=true 才生效，且只在 Safety.EnabledSlots 允许的存档槽）：
 /// 秒杀、无敌、自动读档、自检（每个 Boss 跑 从入场门进场 → 秒杀 → 回大厅，输出通过/失败表）。
 /// </summary>
-internal sealed class DebugTools : MonoBehaviour
+internal sealed partial class DebugTools : MonoBehaviour
 {
     internal static DebugTools? Instance { get; private set; }
 
@@ -177,6 +177,12 @@ internal sealed class DebugTools : MonoBehaviour
             StartSelfTest();
         }
         TickAutoLoad();
+        // 宣传片（Debug.Promo，默认关）。
+        if (GameManager.UnsafeInstance != null)
+        {
+            TickPromo(GameManager.UnsafeInstance);
+        }
+        PromoWatchdog();
     }
 
     /// <summary>
@@ -1065,6 +1071,13 @@ internal sealed class DebugTools : MonoBehaviour
         float nextSlow = nextKill;
         bool everDealt = false;
         var trace = new Dictionary<string, string>();
+        // 宣传片（Debug.Promo）：先让自动操作的大黄蜂真打一会儿，这段时间不用调试伤害。
+        if (PromoRunning)
+        {
+            float bot = Mathf.Max(0f, GodhomeConfig.DebugPromoBotSeconds.Value);
+            promoHoldUntil = Time.unscaledTime + bot;
+            until += bot;
+        }
         while (mc.State == LoomState.Fight && Time.unscaledTime < until && Allowed())
         {
             Beat();
@@ -1099,7 +1112,8 @@ internal sealed class DebugTools : MonoBehaviour
                     : "[Godhome]   恢复攻击 / attacks resumed");
                 held = hold;
             }
-            if (hold == null && Time.unscaledTime >= nextKill)
+            bool promoHold = PromoRunning && Time.unscaledTime < promoHoldUntil;
+            if (hold == null && !promoHold && Time.unscaledTime >= nextKill)
             {
                 int targets = KillBoss(mc, verbose: false, out bool emptied, out bool dealt, fraction: 0.25f, onlyOnScreen: true);
                 if (dealt)
@@ -1115,7 +1129,7 @@ internal sealed class DebugTools : MonoBehaviour
                 nextAdds = Time.unscaledTime + 2f;
                 adds += KillAdds(mc, scenes, b.DebugAddRoots);
             }
-            if (hold == null && b.DebugKill.Count > 0 && Time.unscaledTime >= nextDebugKill)
+            if (hold == null && !promoHold && b.DebugKill.Count > 0 && Time.unscaledTime >= nextDebugKill)
             {
                 nextDebugKill = Time.unscaledTime + 5f;
                 foreach (FsmStep s in b.DebugKill)

@@ -179,6 +179,9 @@ internal static class SaveGuard
         liveSd = gm.sceneData;
         installedPd = fresh.playerData;
         installedSd = fresh.sceneData;
+        // 快照副本是从 JSON 新建的，NonSerialized 的临时纹章标记是默认的 false。拍快照时纹章是临时的，
+        // 游戏那时存档会在 OnBeforeSave 里换回 PreviousCrestID；副本也照样带上标记，免得临时纹章被存成正式的（Codex 终审）。
+        fresh.playerData.IsCurrentCrestTemp = entryRespawn?.CrestTemp ?? false;
         gm.playerData = fresh.playerData;
         gm.sceneData = fresh.sceneData;
         swapDepth = 1;
@@ -199,7 +202,9 @@ internal static class SaveGuard
         {
             return;
         }
-        if (ReferenceEquals(gm.playerData, installedPd) && ReferenceEquals(gm.sceneData, installedSd))
+        bool pdOurs = ReferenceEquals(gm.playerData, installedPd);
+        bool sdOurs = ReferenceEquals(gm.sceneData, installedSd);
+        if (pdOurs && sdOurs)
         {
             gm.playerData = livePd!;
             gm.sceneData = liveSd!;
@@ -207,6 +212,12 @@ internal static class SaveGuard
         else
         {
             GodhomePlugin.Log.LogError("[Godhome] 存档途中数据对象被换掉了，不换回旧对象，作废快照 / save data was replaced during a protected save; not reinstalling, dropping the snapshot");
+            if (pdOurs != sdOurs)
+            {
+                // 只换了一个：内存里一半是快照副本、一半是别的数据。作废快照会抹掉 Stale/Mixed 的判断依据，所以先拦下所有存档（Codex 复查）。
+                GodhomePlugin.Log.LogError("[Godhome] 只换了一个数据对象，拦下所有存档直到回标题画面 / only one save data object was replaced; blocking saves until the title screen");
+                BlockAll = true;
+            }
             Clear();
         }
         livePd = null;
@@ -221,7 +232,8 @@ internal static class SaveGuard
     /// </summary>
     internal static RespawnState? RestoreAndClear(GameManager gm)
     {
-        RespawnState? respawn = RestoreKeep(gm, "回大厅 / back to lobby");
+        // 到达时这一次不清演出标记（见 RestoreKeep 的 leaving）。
+        RespawnState? respawn = RestoreKeep(gm, "回大厅 / back to lobby", leaving: false);
         snapshotJson = null;
         snapshotSlot = -1;
         takenPd = null;
@@ -236,7 +248,8 @@ internal static class SaveGuard
     /// 回程一开始就还原（人还在战场，战场脚本这段时间还可能直接改实时数据），转场途中的存档照样只写快照，
     /// 到了大厅再用 RestoreAndClear 拷一次、丢掉快照。核对不一致或出错就抛异常。返回拍快照时的运行时复活点。
     /// </summary>
-    internal static RespawnState? RestoreKeep(GameManager gm, string when)
+    /// <param name="leaving">离开战场的这一次（回程开始、万神殿下一场）：顺带清掉 Boss 演出关掉的暂停等。到达时那次传 false。</param>
+    internal static RespawnState? RestoreKeep(GameManager gm, string when, bool leaving = true)
     {
         RequireOwner(gm, "还原 / restore (" + when + ")");
         SaveGameData fresh = Fresh();
@@ -250,6 +263,14 @@ internal static class SaveGuard
         }
         // 这几个运行时字段不进存档（NonSerialized），战斗里可能被改：恢复成拍快照时的值，不一律清空（Codex 复审）。
         entryRespawn?.Apply(gm.playerData);
+        // Boss 演出关掉的暂停、物品栏、存档退出（disablePause 等，NonSerialized）：从雕像回来、万神殿两场之间都不经过复活，
+        // 游戏自己的 ResetCutsceneBools 不会跑，会一直带到大厅（审查）。在离开战场时清掉，不等到达：
+        // 到达时目的地的 FSM（例如前作的回程特效）可能刚把暂停关上，那时再清会抢掉它的（Codex 复查）。
+        // 回程开始时这一步出错（快照核对不一致）就不清：那种情况存档已经只写快照，标记留到下次复活或回标题。
+        if (leaving)
+        {
+            gm.playerData.ResetCutsceneBools();
+        }
         // 记忆区域的工具弹药覆盖（PlayerData.toolAmountsOverride，NonSerialized）：进记忆区域时游戏抓一份，
         // 离开时（EnteredNewMapZone 里 HasStoredMemoryState 为真的分支）清掉。快照把 HasStoredMemoryState 拷回成 false，
         // 那个分支就不会走，覆盖会一直留着（读弹药读到覆盖值、改弹药只改覆盖）。快照里不在记忆状态，就照游戏的做法清掉（Codex 审查 0.8.0）。
@@ -392,6 +413,14 @@ internal sealed class RespawnState
     private string? nonLethalMarker;
     private int nonLethalType;
 
+    /// <summary>
+    /// 当前纹章是不是战斗脚本临时换上的（IsCurrentCrestTemp，NonSerialized）。纹章 id 跟着快照还原，这个标记也要跟着还原：
+    /// 留着 true 的话下次存档 OnBeforeSave 会把纹章换成快照里的 PreviousCrestID（审查、Codex 复查）。
+    /// </summary>
+    private bool crestTemp;
+
+    internal bool CrestTemp => crestTemp;
+
     internal static RespawnState Capture(PlayerData pd) => new()
     {
         tempScene = pd.tempRespawnScene,
@@ -400,6 +429,7 @@ internal sealed class RespawnState
         nonLethalScene = pd.nonLethalRespawnScene,
         nonLethalMarker = pd.nonLethalRespawnMarker,
         nonLethalType = pd.nonLethalRespawnType,
+        crestTemp = pd.IsCurrentCrestTemp,
     };
 
     internal void Apply(PlayerData pd)
@@ -410,6 +440,7 @@ internal sealed class RespawnState
         pd.nonLethalRespawnScene = nonLethalScene;
         pd.nonLethalRespawnMarker = nonLethalMarker;
         pd.nonLethalRespawnType = nonLethalType;
+        pd.IsCurrentCrestTemp = crestTemp;
     }
 
     public override string ToString() => $"temp={tempScene ?? "-"}@{tempMarker ?? "-"}/{tempType}, nonLethal={nonLethalScene ?? "-"}@{nonLethalMarker ?? "-"}/{nonLethalType}";

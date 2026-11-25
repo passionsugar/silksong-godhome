@@ -40,7 +40,7 @@
 **结论**：神居存档可以直接借游戏自己的这条路。我们只需要做这些：
 - 让“选择模式”界面在新建存档时总是出现。
 - 把隐藏按钮亮出来，换成我们的中英文名字。
-- 在 `AddGGPlayerDataOverrides` 之后补上满配和出生点。
+- 在 `AddGGPlayerDataOverrides` 之后补上满配和出生点。（2026-11-25 改为 `GameManager.StartNewGame` 的后缀：挂在空函数上的补丁可能被内联掉，见 `Patches/NewGamePatches.cs`。）
 
 **不写状态记录**：用运行时补丁让按钮显示，不去改 `RecBossRushMode`。这个记录存在全局的 `shared.dat` 里，改了就等于动了你的全局存档。
 

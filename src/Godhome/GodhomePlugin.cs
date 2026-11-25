@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using BepInEx;
 using BepInEx.Logging;
@@ -49,10 +51,32 @@ public partial class GodhomePlugin : BaseUnityPlugin, ISaveDataMod<GodhomeSaveDa
         GodhomeSave.LoadKit(Path.Combine(PluginDir, "data", "kit.json"));
         // 前作神居：雕像怎么合并、特殊雕像、五扇门接哪个万神殿（要在雕像表、万神殿表之后读）。
         Hk1Hall.Load(Path.Combine(PluginDir, "data", "hk1.json"));
-        new Harmony(Id).PatchAll(typeof(GodhomePlugin).Assembly);
+        PatchAll();
         gameObject.AddComponent<ModeController>();
         gameObject.AddComponent<LoomUI>();
         gameObject.AddComponent<DebugTools>();
         Log.LogInfo($"[Godhome] {Name} {Version} loaded / 已加载：{BossCatalog.All.Count} 个 Boss，调试模式 / debug = {GodhomeConfig.DebugMode.Value}");
+    }
+
+    /// <summary>只给调试用的补丁（录宣传片的输入、画面比例，淡入的追踪）。调试关着时不打（审查）：每帧的输入更新上不挂东西，
+    /// 游戏更新后这些目标变了也不会连累别的补丁。</summary>
+    private static readonly HashSet<string> DebugOnlyPatches = new(StringComparer.Ordinal)
+    {
+        nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace),
+    };
+
+    /// <summary>和 Harmony.PatchAll 一样逐个类打补丁（出错照样抛出、插件不加载），只是调试关着时跳过调试补丁。</summary>
+    private void PatchAll()
+    {
+        var harmony = new Harmony(Id);
+        bool debug = GodhomeConfig.DebugMode.Value;
+        foreach (Type t in AccessTools.GetTypesFromAssembly(typeof(GodhomePlugin).Assembly))
+        {
+            if (!debug && DebugOnlyPatches.Contains(t.Name))
+            {
+                continue;
+            }
+            harmony.CreateClassProcessor(t).Patch();
+        }
     }
 }

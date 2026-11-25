@@ -311,6 +311,42 @@ internal sealed class ModeController : MonoBehaviour
         SanctumAudio.ReleaseAll(why);
     }
 
+    /// <summary>标题画面每帧的清理（从 Update 挪出来，出错时整块兜底，不影响前面已经解除的存档拦截和模式重置）。</summary>
+    private void TitleCleanup()
+    {
+        // 读档时新大厅可能已经加载、活动场景还是标题：大厅实例还在就不动它（它的黑幕、圣所归它自己）。
+        if (LobbyGone)
+        {
+            if (SanctumArt.Holding || Tk2dArt.Holding || SanctumAudio.Holding || Sanctum.Prepared)
+            {
+                ReleaseSanctum("title / 标题画面");
+            }
+            // 首次接管前就回了标题（InMode 还是 false）也要撤掉大厅的黑幕（Codex 审查 v0.6.0 #7）。
+            // 读档时落脚的本作场景已经加载（活动场景还是标题）：它的黑幕留着。
+            if (LoomUI.Instance != null && LoomUI.Instance.CoverAlpha > 0f && !Hk1EntryShowing)
+            {
+                LoomUI.Instance.ClearCover();
+            }
+            // 雕好的石像在两次进大厅之间留着缓存，回标题才销毁（这时没有雕像在用它们）。
+            StatueCarver.ReleaseAll();
+            // 标题画面不留复制的挑战面板（没有就什么都不做）。
+            ChallengeMenu.Destroy("title / 标题画面");
+            PantheonMenu.Destroy("title / 标题画面");
+            PantheonResultScreen.Destroy("title / 标题画面");
+        }
+        kitAppliedTo = null;
+        hubWalk = false;
+        // 前作神居：标题画面就开始在后台打包（第一次约 4 秒），下次进神居存档时重新决定用不用。
+        if (GodhomeConfig.Hk1Enabled.Value)
+        {
+            Hk1Assets.StartPrepare();
+        }
+        if (!Hk1EntryShowing && !AnyHubLoaded())
+        {
+            Hk1Lobby.Reset();
+        }
+    }
+
     private void Update()
     {
         GameManager gm = GameManager.UnsafeInstance;
@@ -320,46 +356,24 @@ internal sealed class ModeController : MonoBehaviour
         }
         if (gm.IsMenuScene())
         {
-            if (InMode)
-            {
-                // 回到标题画面：战斗中存的档已经是快照，这里只需丢掉内存状态。
-                ForceReset("returned to title / 回到标题画面");
-            }
-            // 读档时新大厅可能已经加载、活动场景还是标题：大厅实例还在就不动它（它的黑幕、圣所归它自己）。
-            if (LobbyGone)
-            {
-                if (SanctumArt.Holding || Tk2dArt.Holding || SanctumAudio.Holding || Sanctum.Prepared)
-                {
-                    ReleaseSanctum("title / 标题画面");
-                }
-                // 首次接管前就回了标题（InMode 还是 false）也要撤掉大厅的黑幕（Codex 审查 v0.6.0 #7）。
-                // 读档时落脚的本作场景已经加载（活动场景还是标题）：它的黑幕留着。
-                if (LoomUI.Instance != null && LoomUI.Instance.CoverAlpha > 0f && !Hk1EntryShowing)
-                {
-                    LoomUI.Instance.ClearCover();
-                }
-                // 雕好的石像在两次进大厅之间留着缓存，回标题才销毁（这时没有雕像在用它们）。
-                StatueCarver.ReleaseAll();
-                // 标题画面不留复制的挑战面板（没有就什么都不做）。
-                ChallengeMenu.Destroy("title / 标题画面");
-                PantheonMenu.Destroy("title / 标题画面");
-                PantheonResultScreen.Destroy("title / 标题画面");
-            }
-            kitAppliedTo = null;
-            // 前作神居：标题画面就开始在后台打包（第一次约 4 秒），下次进神居存档时重新决定用不用。
-            if (GodhomeConfig.Hk1Enabled.Value)
-            {
-                Hk1Assets.StartPrepare();
-            }
-            if (!Hk1EntryShowing && !AnyHubLoaded())
-            {
-                Hk1Lobby.Reset();
-            }
-            hubWalk = false;
+            // 先解除存档拦截、再清理：下面的清理万一抛异常（每帧都会再抛），拦截也不能带进接着读的普通存档（审查）。
             if (SaveGuard.BlockAll)
             {
                 SaveGuard.BlockAll = false;
                 GodhomePlugin.Log.LogInfo("[Godhome] 回到标题画面，解除存档拦截 / back at the title screen, saves unblocked");
+            }
+            if (InMode)
+            {
+                // 回到标题画面：战斗中存的档已经是快照，这里只需丢掉内存状态。ForceReset 每一步单独兜底，最后一定回到 Off。
+                ForceReset("returned to title / 回到标题画面");
+            }
+            try
+            {
+                TitleCleanup();
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogError($"[Godhome] 标题画面清理出错 / title-screen cleanup failed: {e}");
             }
             return;
         }
@@ -645,9 +659,22 @@ internal sealed class ModeController : MonoBehaviour
     internal void ForceReset(string reason)
     {
         GodhomePlugin.Log.LogInfo($"[Godhome] 模式重置 / mode reset: {reason}");
-        SaveGuard.Clear();
+        // 每一步单独兜底（审查）：前面哪一步抛异常，后面的清理（尤其是束缚、快照）照样做，最后一定回到 Off，
+        // 否则模式状态会带进接着读的普通存档（死亡不致命、出口改道、成就被拦）。
+        static void Step(string what, Action a)
+        {
+            try
+            {
+                a();
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogError($"[Godhome] 模式重置时这一步出错 / mode reset step failed ({what}): {e}");
+            }
+        }
+        Step("snapshot", SaveGuard.Clear);
         // 万神殿连战作废（回标题、换存档：这次不记录），束缚解开，结算不再弹。
-        UnhookDamage();
+        Step("damage hook", UnhookDamage);
         if (Run != null)
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿作废 / pantheon dropped: {Run}（{reason}）");
@@ -655,8 +682,8 @@ internal sealed class ModeController : MonoBehaviour
         Run = null;
         runFight = false;
         pendingResult = null;
-        Bindings.Clear("mode reset / 模式重置");
-        LoomUI.Instance?.AbortResult("mode reset");
+        Step("bindings", () => Bindings.Clear("mode reset / 模式重置"));
+        Step("result", () => LoomUI.Instance?.AbortResult("mode reset"));
         CurrentBoss = null;
         bossHms.Clear();
         ourTransition = false;
@@ -666,16 +693,16 @@ internal sealed class ModeController : MonoBehaviour
         returnStatue = null;
         deathReturn = null;
         hubWalk = false;
-        Hk1Doors.ClearPending();
-        Hk1Spa.ClearSetup();
-        Hk1Battle.Clear();
-        Arena.Clear();
-        LoomUI.Instance?.AbortChallenge("mode reset");
+        Step("hk1 doors", Hk1Doors.ClearPending);
+        Step("hk1 spa", Hk1Spa.ClearSetup);
+        Step("hk1 battle", Hk1Battle.Clear);
+        Step("arena", Arena.Clear);
+        Step("challenge", () => LoomUI.Instance?.AbortChallenge("mode reset"));
         // 复制的挑战面板挂在常驻的 UICanvas 下：模式重置（回标题、换存档）时销毁，下次打开再复制。
-        ChallengeMenu.Destroy("mode reset / 模式重置");
-        PantheonMenu.Destroy("mode reset / 模式重置");
-        PantheonResultScreen.Destroy("mode reset / 模式重置");
-        LoomUI.Instance?.ClearCover();
+        Step("challenge menu", () => ChallengeMenu.Destroy("mode reset / 模式重置"));
+        Step("pantheon menu", () => PantheonMenu.Destroy("mode reset / 模式重置"));
+        Step("result screen", () => PantheonResultScreen.Destroy("mode reset / 模式重置"));
+        Step("cover", () => LoomUI.Instance?.ClearCover());
         lobbyRespawn = null;
         restoreFailed = false;
         fightSerial++;
@@ -684,12 +711,12 @@ internal sealed class ModeController : MonoBehaviour
         // 大厅已经不在了才在这里放（Codex 审查 v0.6.0 #10：不按“是不是活动场景”猜）。
         if (LobbyGone)
         {
-            ReleaseSanctum("mode reset / 模式重置");
+            Step("sanctum", () => ReleaseSanctum("mode reset / 模式重置"));
         }
         // 前作神居同理：房间都不在了才放掉前作的场景包，下次进大厅重新决定（Codex 审查）。
         if (!Hk1EntryShowing && !AnyHubLoaded())
         {
-            Hk1Lobby.Reset();
+            Step("hk1 lobby", Hk1Lobby.Reset);
         }
     }
 
@@ -846,7 +873,8 @@ internal sealed class ModeController : MonoBehaviour
 
     private void OnLobbyArrive(string scene)
     {
-        bool walk = hubWalk;
+        // 走门只在前作神居里算数：前作神居中途放弃了（转场超时），迟到的到达按正常回大厅处理（审查）。
+        bool walk = hubWalk && Hk1Lobby.Active;
         hubWalk = false;
         if (walk)
         {
@@ -863,6 +891,7 @@ internal sealed class ModeController : MonoBehaviour
         runFight = false;
         lobbyRespawn?.Apply(PlayerData.instance);
         lobbyRespawn = null;
+        // 临时纹章标记、Boss 演出关掉的暂停等：在离开战场时（SaveGuard.RestoreKeep）就处理了，不在到达时清（Codex 复查）。
         SetState(LoomState.Lobby);
         CurrentBoss = null;
         bossHms.Clear();
@@ -1633,6 +1662,9 @@ internal sealed class ModeController : MonoBehaviour
             case LoomState.Fight:
             case LoomState.Won:
                 return CurrentBoss == null || !CurrentBoss.AllowScenes.Contains(scene);
+            case LoomState.ToFight:
+                // 刚进战场、还没切到 Fight 时（场景里的预加载组件 Start 就在这时）也一样：战场以外的都会被改道（审查）。
+                return CurrentBoss == null || !(scene == CurrentBoss.EntryScene || scene == CurrentBoss.Scene || CurrentBoss.AllowScenes.Contains(scene));
             case LoomState.Rest:
             case LoomState.ToRest:
                 // 休息点：离开就改道去下一场（没有连战就回大厅），FilterTransition 一律改道（Codex 复审）。
@@ -2086,6 +2118,8 @@ internal sealed class ModeController : MonoBehaviour
             {
                 // 回前作神居卡住了：回标题重新读档以后改用织忆圣所，不再卡在同一个地方（Codex 审查）。
                 Hk1Lobby.Abandon("the transition to the hk1 hub never finished / 进前作神居一直没完成");
+                // 和重试那条路一样清掉走门标记：迟到的到达不能按“走门”处理（那样不搭圣所、不回血、不存档，审查）。
+                hubWalk = false;
             }
             Bindings.Clear("transition timed out / 切场景超时");
             if (SaveGuard.Active)
