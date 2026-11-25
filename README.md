@@ -22,7 +22,7 @@ A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx
 
 ## 从源码构建
 
-- 需要 .NET SDK 8 或更新的版本。游戏的引用来自 NuGet 包 `Silksong.GameLibs`，构建不需要游戏目录。
+- 需要 .NET SDK（开发和测试用的是 10.0；项目用最新的 C# 语言版本，旧的 SDK 可能编不过）。游戏的引用来自 NuGet 包 `Silksong.GameLibs`，构建不需要游戏目录。
 - `dotnet build src/Godhome/Godhome.csproj -c Release`
 - 想构建完直接装进游戏：构建时加 `-p:SilksongPluginsFolder=<游戏目录>\BepInEx\plugins`，或者在 `src/Godhome/` 放一个 `SilksongPath.props`（不进 git）。
 - 打安装包：`powershell -File scripts/package.ps1`。脚本的路径在 `scripts/env.ps1`，和默认值不一样的，写进 `scripts/env.local.ps1`（不进 git）。
@@ -43,7 +43,7 @@ A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx
 
 Requirements: *Hollow Knight: Silksong* (tested on 1.0.30000), BepInExPack_Silksong 1.0.3, DataManager 1.2.2 and I18N 1.1.1 by silksong_modding. For the optional Godhome: UnitySceneRepacker 0.3.0 by jakobhellermann and *Hollow Knight* itself (Steam installs are found automatically; otherwise set `Experimental.Hk1GameDir`).
 
-Build: .NET SDK 8+, `dotnet build src/Godhome/Godhome.csproj -c Release`. Most of the documentation is in Chinese.
+Build: .NET SDK (developed and tested with 10.0; the project uses the latest C# version, so older SDKs may fail), `dotnet build src/Godhome/Godhome.csproj -c Release`. Most of the documentation is in Chinese.
 
 ## 许可 / License
 
