@@ -111,10 +111,43 @@ internal static class GodhomeSave
     internal static int ApplyKit(PlayerData pd)
     {
         int fields = ApplyFields(pd);
+        // 读档时已经写进去的也算（接管时照样存一次档）。
+        if (ReferenceEquals(loadApplied, pd))
+        {
+            fields += loadChanges;
+        }
+        loadApplied = null;
+        loadChanges = 0;
         int tools = kitTools ? UnlockTools() : 0;
         int crests = kitCrests ? UnlockCrests() : 0;
         GodhomePlugin.Log.LogInfo($"[Godhome] 满配 / kit applied: {fields} 个字段, 新解锁工具 / tools {tools}, 新解锁纹章 / crests {crests}");
         return fields + tools + crests;
+    }
+
+    /// <summary>读档时（ApplyFieldsOnLoad）写进去的是哪份数据、改了几项：接管时 ApplyKit 算进去。</summary>
+    private static PlayerData? loadApplied;
+    private static int loadChanges;
+
+    /// <summary>
+    /// 读进神居存档时（标题画面，SetLoadedGameData 之后，见 NewGamePatches.cs 的 GodhomeLoadPatch）先写满配的数值字段。
+    /// 主要是 bindCutscenePlayed：HUD 要它为真才画血、丝轴（以前的神居存档里是假，进游戏前不补上 HUD 就一直不出来）。
+    /// 工具、纹章照旧进游戏后（ApplyKit）再解锁。
+    /// </summary>
+    /// <summary>读进的不是神居存档：丢掉上一份神居存档读档时的记录（没走到接管就回标题时，它还拿着那份数据）。</summary>
+    internal static void ForgetLoad()
+    {
+        loadApplied = null;
+        loadChanges = 0;
+    }
+
+    internal static void ApplyFieldsOnLoad(PlayerData pd)
+    {
+        bool hudWaiting = !pd.bindCutscenePlayed;
+        int n = ApplyFields(pd);
+        loadApplied = pd;
+        loadChanges = n;
+        GodhomePlugin.Log.LogInfo($"[Godhome] 读进神居存档 / godhome save loaded: 满配字段 / kit fields set {n}" +
+            (hudWaiting && pd.bindCutscenePlayed ? "（HUD 不再等开场 / the HUD no longer waits for the opening）" : ""));
     }
 
     private static int ApplyFields(PlayerData pd)

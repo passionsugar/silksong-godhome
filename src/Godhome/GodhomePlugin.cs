@@ -55,6 +55,7 @@ public partial class GodhomePlugin : BaseUnityPlugin, ISaveDataMod<GodhomeSaveDa
         gameObject.AddComponent<ModeController>();
         gameObject.AddComponent<LoomUI>();
         gameObject.AddComponent<DebugTools>();
+        Probe.Install(gameObject);
         Log.LogInfo($"[Godhome] {Name} {Version} loaded / 已加载：{BossCatalog.All.Count} 个 Boss，调试模式 / debug = {GodhomeConfig.DebugMode.Value}");
     }
 

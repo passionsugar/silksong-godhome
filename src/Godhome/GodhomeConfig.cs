@@ -42,6 +42,7 @@ internal static class GodhomeConfig
     internal static ConfigEntry<string> DebugPromoBosses = null!;
     internal static ConfigEntry<float> DebugPromoBotSeconds = null!;
     internal static ConfigEntry<bool> DebugPromoMuteMusic = null!;
+    internal static ConfigEntry<string> DebugProbe = null!;
 
     internal static void Bind(ConfigFile cfg)
     {
@@ -58,6 +59,9 @@ internal static class GodhomeConfig
             "调试用：宣传片里每场先让自动操作的大黄蜂真打这么多秒，之后才用调试伤害收尾。\nDebug: in the promo, let the auto-piloted Hornet really fight for this many seconds before the debug damage finishes the boss.");
         DebugPromoMuteMusic = cfg.Bind("Debug", "PromoMuteMusic", true,
             "调试用：录宣传片时把游戏音乐调成静音（只在运行时改混音器，不改设置），只录音效。\nDebug: mute the game's music while recording the promo (runtime mixer only, settings untouched), so only sound effects are recorded.");
+        DebugProbe = cfg.Bind("Debug", "Probe", "",
+            "调试用：探针，只记日志。逗号分隔：hud（HUD 的显示状态和谁改的）、audio（每秒的输出音量、场景的音频快照）、arena=场景名前缀（进场后大黄蜂的位置、附近地面、FSM 状态变化）。留空 = 关。\n" +
+            "Debug: probes that only log. Comma separated: hud (HUD visibility and who changed it), audio (output level every second, the scene's audio snapshots), arena=<scene prefix> (hero position, nearby ground and FSM state changes after entering). Empty = off.");
         DebugHk1Tour = cfg.Bind("Debug", "Hk1Tour", false,
             "调试用：自动读档进前作的神居后巡视一遍（门、挑战界面、开一次万神殿、手办屋的雕像、拉杆、从雕像开一场、走回前厅和屋顶）并截图。\n" +
             "Debug: after the auto-load into Hollow Knight's Godhome, tour it (doors, challenge UIs, one pantheon start, the Hall of Gods statues, a lever, a statue fight, walking back to the atrium and roof) taking screenshots.");

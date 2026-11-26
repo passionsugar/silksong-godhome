@@ -898,6 +898,9 @@ internal sealed class ModeController : MonoBehaviour
         Arena.Clear();
         SetDeathRespawnToLobby();
         Heal();
+        // 兜底：战斗中放弃、Boss 演出收着 HUD 时被改道回来、判胜后死了，到了大厅 HUD 还收着就叫回来（大厅里没有该藏 HUD 的演出）。
+        // 放在回满血之后：RestoreHud 见没血就当人在死，不叫。
+        RestoreHud("arrived / 到达大厅");
         // 从雕像开的战：游戏已经按回程门把人放在雕像前了（door_dreamReturn → bossReturnEntryGate），这里只核对。
         if (returnStatue != null)
         {
@@ -1275,6 +1278,35 @@ internal sealed class ModeController : MonoBehaviour
     /// </summary>
     private static (string Scene, string Gate, bool Respawning) RestStop()
         => Hk1Spa.Usable ? (Hk1Lobby.Spa, Hk1Lobby.DreamEnterGate, false) : (PantheonCatalog.RestScene, PantheonCatalog.RestMarker, true);
+
+    /// <summary>
+    /// 上一场的演出把 HUD 收起来了，叫回来。HUD 本来就在就什么都不做。
+    /// 例：寡妇倒下的过场给 HUD 发 OUT（正常游戏里过场放完才 IN），万神殿不放完过场就去下一场，
+    /// 下一场（蕾丝）整场都没有血量显示（探针实测，2026-11-26）。
+    /// 调用的地方：SetState 从 Won 离开时（在旧场景里发，下一场的开场演出要藏 HUD 的照样能在加载后再藏）；到达大厅时兜底。
+    /// </summary>
+    private static void RestoreHud(string why)
+    {
+        GameCameras gc = GameCameras.SilentInstance;
+        if (gc == null || gc.hudCanvasSlideOut == null || gc.IsHudVisible)
+        {
+            return;
+        }
+        // 人正在死（判胜以后、离场之前死了，OnHeroDying 从 Won 切到 ToLobby）：不在死亡演出前叫，复活到大厅时兜底（Codex 复查 #3）。
+        HeroController hero = HeroController.SilentInstance;
+        if (hero != null && (hero.cState.dead || PlayerData.instance.health <= 0))
+        {
+            return;
+        }
+        // 已经在滑入（In Wait → Come In，“Is Visible”要到 Come In 才变真）：不用再叫。
+        string was = gc.hudCanvasSlideOut.ActiveStateName;
+        if (was is "In Wait" or "Come In")
+        {
+            return;
+        }
+        gc.HUDIn();
+        GodhomePlugin.Log.LogInfo($"[Godhome] HUD 是收起的，叫回来 / the HUD was hidden, bringing it back（{why}，HUD {was} → {gc.hudCanvasSlideOut.ActiveStateName}）");
+    }
 
     /// <summary>去休息点（RestStop）。</summary>
     private void GoRest(GameManager.SceneLoadInfo? redirect)
@@ -2174,6 +2206,7 @@ internal sealed class ModeController : MonoBehaviour
 
     private void SetState(LoomState s)
     {
+        LoomState was = State;
         if (State != s)
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 状态 / state {State} → {s}");
@@ -2182,6 +2215,12 @@ internal sealed class ModeController : MonoBehaviour
         }
         State = s;
         stateSince = Time.unscaledTime;
+        // 赢了离开战场（下一场、休息点、回大厅，包括改道游戏自己的转场）：Boss 倒下的演出收起的 HUD 叫回来。
+        // 只在从 Won 走的时候：从大厅开战（面板、雕像的选难度界面自己会收、会放）、战斗中放弃、死亡都不在这里管（Codex 审查第七轮 #1、#4）。
+        if (was == LoomState.Won && s is LoomState.ToFight or LoomState.ToRest or LoomState.ToLobby)
+        {
+            RestoreHud($"leaving the won arena / 赢了离开战场 → {s}");
+        }
     }
 
     /// <summary>提示只写日志、不上屏（界面上不要有文字）。保留这个入口，出错时日志里看得到。</summary>

@@ -52,6 +52,9 @@
 | 全部纹章，加上额外的蓝、黄槽 | 游戏自带的 `ToolItemManager.UnlockAllCrests()` | ToolItemManager.cs:750 |
 | 移动和战斗能力 | `hasDash`、`hasWalljump`、`hasDoubleJump`、`hasBrolly`、`hasHarpoonDash`、`hasSuperJump`、`hasChargeSlash`、`hasNeedolin`、`hasNeedolinMemoryPowerup`、`hasSilkSpecial`、`hasParry` 等 | PlayerData.cs:226-269 |
 | 数值 | 面具 `maxHealthBase`、灵丝 `silkMax`、丝之心 `silkRegenMax`、织针 `nailUpgrades`、工具袋 `ToolPouchUpgrades` / `ToolKitUpgrades` | PlayerData.cs:132-226、2762-2764 |
+| HUD 出现 | `bindCutscenePlayed`（2026-11-26 加）：HUD 的面具、灵丝轴、缚丝球、工具图标的 FSM 都要它为真才出现，为假时一直等开场的缚丝演出。神居存档不播开场，不补上左上角什么都不画 | PlayerData.cs:957；HUD 的 `health_display` / `Animate` / `Display` / `Icons Scale In` |
+
+数值字段新建时就写进去；以前建的神居存档每次读档时（`GameManager.SetLoadedGameData` 的后缀，还在标题画面、HUD 没初始化）先写一遍，进游戏后接管时再补工具、纹章。
 
 每一项的最大值，阶段 1 会从游戏的升级物品数据里查准，不靠猜。圣所里放一张长椅，用来换纹章和工具。
 

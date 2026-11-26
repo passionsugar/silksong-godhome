@@ -136,6 +136,8 @@ internal static class GodhomeNewSavePatch
         PlayerData? pd = __instance.playerData;
         if (!bossRushMode || pd == null)
         {
+            // 新建普通存档：丢掉上一份没走到接管的神居存档读档记录（Codex 复查 #6）。
+            GodhomeSave.ForgetLoad();
             return;
         }
         // 原函数被别的补丁跳过时后缀照样会跑（HarmonyX），这时 playerData 还是旧的那份，不能改（Codex 审查）。
@@ -145,5 +147,35 @@ internal static class GodhomeNewSavePatch
             return;
         }
         GodhomeSave.SetupNew(pd);
+    }
+}
+
+/// <summary>
+/// 读进神居存档：还在标题画面、HUD 还没开始初始化，先把满配的数值字段写进去（GodhomeSave.ApplyFieldsOnLoad）。
+/// 为的是 bindCutscenePlayed（玩家反馈“左上角的血量不显示”）：HUD 的面具、丝轴、工具图标都要它为真才出现，
+/// 为假时一直等开场的缚丝演出（神居存档不播开场），左上角什么都不画。进游戏后接管时（ApplyKit）再补就晚了：
+/// HUD 的 FSM 进游戏时已经停在“等开场”，这一趟游戏里都不会出来。
+/// 所有读档的路都经过 SetLoadedGameData(SaveGameData, int)（反编译 GameManager.cs:4545-4636）。普通存档什么都不做。
+/// </summary>
+[HarmonyPatch(typeof(GameManager), "SetLoadedGameData", new[] { typeof(SaveGameData), typeof(int) })]
+internal static class GodhomeLoadPatch
+{
+    private static void Postfix(GameManager __instance)
+    {
+        PlayerData? pd = __instance.playerData;
+        if (pd == null || !GodhomeSave.IsGodhome(pd))
+        {
+            // 上一份神居存档没走到接管就回标题了：不再拿着它（Codex 审查第七轮 #6）。
+            GodhomeSave.ForgetLoad();
+            return;
+        }
+        try
+        {
+            GodhomeSave.ApplyFieldsOnLoad(pd);
+        }
+        catch (System.Exception e)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 读档时写满配出错 / applying the kit on load failed: {e.Message}");
+        }
     }
 }

@@ -24,6 +24,7 @@
     "HasSeenHarpoon": true,
     "HasSeenEvaHeal": true,
     "HasSeenSilkHearts": true,
+    "bindCutscenePlayed": true,
     "silkMax": 18,
     "silkSpoolParts": 0,
     "heartPieces": 0,

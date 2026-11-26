@@ -34,6 +34,7 @@ internal static class BossSceneUnlockedPatch
 ///   丝之歌是别的区，前作场景的精灵又大多吃环境光，于是整张图发暗，只剩角色光照到的一圈亮。这里打开 overrideColorSettings。
 /// - 饱和度：前作在场景值上加 0.17，丝之歌加 0.4；按前作的算法算好，再让丝之歌不加。
 /// - scenePools：前作没有这个字段（null），丝之歌 Awake 遍历它就是日志里的 CustomSceneManager.Awake 空引用。
+/// - 音频快照属于前作的混音器，丝之歌自己的音乐、角色混音器没人恢复（神居里没声音），换成丝之歌的（Hk1Audio）。
 /// </summary>
 [HarmonyPatch(typeof(CustomSceneManager), "Awake")]
 internal static class Hk1SceneManagerAwakePatch
@@ -57,7 +58,29 @@ internal static class Hk1SceneManagerAwakePatch
         // 神居的三间屋子和温泉都是（温泉漏过一次：scenePools 空引用，实机日志）。丝之歌自己没有这些场景名。
         if (!Hk1Lobby.IsHk1Scene(scene))
         {
+            // 只读：记下丝之歌自己的环境效果混音器，前作场景换快照时用（Hk1Audio）。
+            Hk1Audio.NoteOurs(__instance);
             return;
+        }
+        // 音频是全局的：只在正式切进这个场景时换。游戏切场景的几条路（BeginSceneTransition、旧的 ChangeToScene → LoadScene、
+        // LoadSceneAdditive）都在加载前把 nextSceneName 设成目的地（反编译 GameManager.cs:696、3062、3075）。
+        // 调试实验 Hk1Probe 附加加载的前作房间（它直接用 UnitySceneRepacker 读）不是目的地，不动，免得停掉当前场景还在用的环境音（Codex 审查第七轮 #2、复查 #1）。
+        // 已知：那个附加房间自己的 Start 照样会把前作的音乐配置交给 AudioManager（复查 #2），只在调试实验里，玩家碰不到。
+        GameManager gm = GameManager.UnsafeInstance;
+        if (gm != null && gm.nextSceneName == scene)
+        {
+            try
+            {
+                GodhomePlugin.Log.LogInfo($"[Godhome] 前作神居 {scene}：音频换成丝之歌的混音器 / audio moved to our mixers：{Hk1Audio.Adopt(__instance)}");
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作神居 {scene}：换音频快照出错 / audio fix failed: {e.Message}");
+            }
+        }
+        else
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作神居 {scene}：不是这次切场景的目的地（附加加载），不动音频 / not the transition's destination (additive load), audio left alone");
         }
         try
         {

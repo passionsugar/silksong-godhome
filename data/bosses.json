@@ -334,6 +334,12 @@
             "fsm": "Control",
             "state": "Death Start"
           }
+        ],
+        "patch": [
+          {
+            "type": "activate",
+            "path": "Boss Scene/Lava Plats"
+          }
         ]
       },
       "bossObjects": [
@@ -358,7 +364,7 @@
       "journal": [
         "Song Golem"
       ],
-      "notes": "附加场景。加载条件 defeatedSongGolem=false 且 hasBrolly=true（需要先拿到伞）。另有 _rest 附加场景是战前休眠状态。"
+      "notes": "附加场景。加载条件 defeatedSongGolem=false 且 hasBrolly=true（需要先拿到伞）。另有 _rest 附加场景是战前休眠状态。岩浆上的浮台（Boss Scene/Lava Plats）原本要等 Control 进 Remeet Ready（人就位以后）才打开，门在岩浆正上方，进场找地面时浮台还没出来，人落到岩浆底下、先挨一下烫（玩家反馈、探针实测 y 2.6，岩浆区 y -1.7..4.0）；加载时先打开。"
     },
     {
       "id": "savage_beastfly",
