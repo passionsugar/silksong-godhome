@@ -33,6 +33,9 @@ internal static class ArrivalWatch
     /// <summary>这一场里人还没恢复操作（进场动画、吼叫定身、转场中）时碰到的伤害次数。</summary>
     private static int beforeControl;
 
+    /// <summary>这次落地后人拿到过操作没有（每帧看一次，挨打时也看）。</summary>
+    private static bool hadControl;
+
     /// <summary>
     /// 这次自检里进场挨过打的场次（自检结束时汇总后清掉）。自检报告也列出来（Codex 审计 0.10.3 第 6.4 节：
     /// 以前只写日志，报告里照样“全部通过”）。“恢复操作前”的伤害玩家躲不开，是落点要改；之后的是正常交战，只作参考。
@@ -61,6 +64,7 @@ internal static class ArrivalWatch
         landed = at;
         hits.Clear();
         beforeControl = 0;
+        hadControl = false;
         watched = 0f;
         int mine = ++serial;
         string near = NearestBoss(b, at);
@@ -178,6 +182,10 @@ internal static class ArrivalWatch
             {
                 watched += Time.unscaledDeltaTime;
             }
+            if (!hadControl && HeroController.SilentInstance is HeroController h && HasControl(h))
+            {
+                hadControl = true;
+            }
         }
         if (mine != serial)
         {
@@ -224,7 +232,8 @@ internal static class ArrivalWatch
     /// <summary>HeroController.TakeDamage 前缀里调：窗口里就记一笔。</summary>
     internal static void OnDamage(HeroController hero, GameObject? go, int damage, HazardType hazard)
     {
-        if (!Watching)
+        // 自检自己故意打的（入场检查的尖刺、死亡重试的一击，DebugTools.Entry.cs）不是场地的问题，不记。
+        if (!Watching || (go != null && go.name.StartsWith("Godhome Self-test", StringComparison.Ordinal)))
         {
             return;
         }
@@ -233,11 +242,16 @@ internal static class ArrivalWatch
             Vector2 p = hero.transform.position;
             string src = go != null ? SceneTools.PathOf(go.transform) : "-";
             bool control = HasControl(hero);
-            if (!control)
+            hadControl |= control;
+            // 只有落地后还没拿到过操作时挨的才算“恢复操作前”（玩家躲不开，要改落点）。拿到过操作、后来又被收走
+            // （Boss 倒下的过场之类）不是落点的问题：自检秒杀时 Boss 的收尾会落进这个窗口（0.10.5 实测：黑寡妇 8.6 秒判胜，
+            // 7.6 秒时 Hornet Connect 把人挪到寡妇身边播收尾，场上残留的钟碰到人）。
+            string tag = control ? "" : hadControl ? "[过场中 / control taken] " : "[操作前 / no control] ";
+            if (!control && !hadControl)
             {
                 beforeControl++;
             }
-            hits.Add($"{watched:0.0}s {(control ? "" : "[操作前 / no control] ")}{src} 伤害 / dmg {damage} {hazard} 人在 / hero ({p.x:0.0}, {p.y:0.0})");
+            hits.Add($"{watched:0.0}s {tag}{src} 伤害 / dmg {damage} {hazard} 人在 / hero ({p.x:0.0}, {p.y:0.0})");
         }
         catch (Exception e)
         {

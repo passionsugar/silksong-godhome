@@ -797,6 +797,12 @@ internal sealed partial class DebugTools : MonoBehaviour
         public bool? Clean;
         public bool Return;
 
+        /// <summary>回大厅后主角能正常落地、状态正常（HeroCheck.Fall）。没测（没回到大厅、万神殿）是 null。</summary>
+        public bool? Fall;
+
+        /// <summary>入场点专项（DebugTools.Entry.cs：落点、危险复活、死亡重试）。没测是 null。</summary>
+        public bool? EntryCheck;
+
         /// <summary>万神殿自检在这一场放弃（测放弃流程）：开战、找到、击杀、干净都没测，报告写 N/A；只看进场和回到大厅。</summary>
         public bool Abandon;
         public string Scene = "";
@@ -1177,6 +1183,8 @@ internal sealed partial class DebugTools : MonoBehaviour
         SelfTestRunning = true;
         rows.Clear();
         extra.Clear();
+        resourceLines.Clear();
+        resourceFail = false;
         ArrivalWatch.Reset();
         planned = list.Count;
         reportStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -1285,6 +1293,10 @@ internal sealed partial class DebugTools : MonoBehaviour
                 yield return Wait(1.2f);
                 yield return Shots.Capture(shot + "-1-arena.jpg", row.Shots);
                 GodhomePlugin.Log.LogInfo($"[Godhome]   画面 / view {b.Id}: {ViewInfo.Darkness()}；{ViewInfo.Covering(8)}{ViewInfo.MaskOwners()}");
+                if (EntryChecked(b) && mc.State == LoomState.Fight && Allowed())
+                {
+                    yield return Beating(EntryChecks(mc, b, shot, row));
+                }
 
                 // 3. 自己开战：不替玩家触发。只认表里的开战判定（arena.wake）：等的 FSM 在等待状态里待过、又离开了，
                 //    或者 BattleScene 开战了。没写开战判定的 Boss 算没开战（表要补）。
@@ -1424,6 +1436,17 @@ internal sealed partial class DebugTools : MonoBehaviour
             {
                 yield return Wait(1.5f);
                 yield return Shots.Capture(shot + "-4-lobby.jpg", row.Shots);
+                // 0.10.5：回大厅后真的能落地（Boss 演出改了刚体、重力、显示时这里抓得到，自检别的项都不要求人自己动）。
+                var fall = new HeroCheck.Result();
+                yield return Beating(HeroCheck.Fall(fall));
+                row.Fall = fall.Ok;
+                row.Note += (row.Note.Length > 0 ? "; " : "") + (fall.Ok ? "PASS " : "FAIL ") + fall.Detail;
+                GodhomePlugin.Log.LogInfo($"[Godhome]   {b.Id} {(fall.Ok ? "PASS" : "FAIL")} {fall.Detail}");
+                if (EntryChecked(b) && mc.State == LoomState.Lobby && Allowed())
+                {
+                    yield return Beating(RetryCheck(mc, b, shot, row, timeout));
+                    row.Return = mc.State == LoomState.Lobby;
+                }
             }
             if (mc.WinRedirects > 0)
             {
@@ -1437,6 +1460,13 @@ internal sealed partial class DebugTools : MonoBehaviour
                 abort = $"{b.Id} 之后没回到大厅 / did not return to the lobby after {b.Id} (state={mc.State})";
                 break;
             }
+        }
+
+        // 0.10.5：念珠、工具碎片无限（念珠炮、建筑师），走游戏自己的花钱、开炮、现场打造入口。
+        if (abort == null && mc.State == LoomState.Lobby && Allowed())
+        {
+            yield return Beating(ResourceSelfTest());
+            WriteReport(final: false, abort: null);
         }
 
         // 结束时在大厅存一次档，要真的成功才算完成（Codex 复审：以前不等存档就退出游戏）。
@@ -1460,7 +1490,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         WriteReport(final: true, abort: abort);
         SelfTestStatus = abort == null ? "完成 / done" : "中止 / aborted";
         // 和报告用同一个判定（Codex 审查 #29）。
-        GodhomePlugin.Log.LogInfo($"[Godhome] 自检结束 / self-test finished: {rows.Count(Passed)}/{rows.Count} 全部通过（计划 / planned {planned}）{(abort != null ? $"，中止 / aborted: {abort}" : "")}");
+        GodhomePlugin.Log.LogInfo($"[Godhome] 自检结束 / self-test finished: {rows.Count(Passed)}/{rows.Count} 全部通过（计划 / planned {planned}）{(resourceLines.Count > 0 ? (resourceFail ? "，资源 / resources FAIL" : "，资源 / resources PASS") : "")}{(abort != null ? $"，中止 / aborted: {abort}" : "")}");
         ArrivalWatch.Summary();
         bool quit = abort == null && rows.Count == planned && GodhomeConfig.DebugQuitAfterSelfTest.Value;
         SelfTestRunning = false;
@@ -1518,7 +1548,7 @@ internal sealed partial class DebugTools : MonoBehaviour
 
     private static bool Passed(Row r) => r.Abandon
         ? r.Entered && r.Return
-        : r.Entered && r.Start && r.Found && r.Kill && r.Clean != false && r.Return;
+        : r.Entered && r.Start && r.Found && r.Kill && r.Clean != false && r.Return && r.Fall != false && r.EntryCheck != false;
 
     /// <summary>
     /// “打完干净”：胜利后（这一场还在 Won）还有没有活着的本体（有就是可能提前判赢）。只看 Boss 的血量组件。
@@ -1640,6 +1670,8 @@ internal sealed partial class DebugTools : MonoBehaviour
         SelfTestRunning = true;
         rows.Clear();
         extra.Clear();
+        resourceLines.Clear();
+        resourceFail = false;
         ArrivalWatch.Reset();
         planned = abortAt > 0 ? Mathf.Min(abortAt, p.Bosses.Count) : p.Bosses.Count;
         reportStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
@@ -1880,6 +1912,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         int crestOk = 0, crestChecks = 0;
         int blueSet = -1;
         int blueOk = 0, blueChecks = 0;
+        int heroOk = 0, heroChecks = 0;
         for (int i = 0; abort == null && i < p.Bosses.Count; i++)
         {
             BossDef b = p.Bosses[i];
@@ -1943,8 +1976,20 @@ internal sealed partial class DebugTools : MonoBehaviour
                 bool needleOk = (bindings & Binding.Needle) == 0 ? pd.nailDamage == raw : pd.nailDamage == Bindings.NeedleDamage(raw);
                 bool maskOk = (bindings & Binding.Mask) == 0 || pd.CurrentMaxHealth <= PantheonCatalog.Bindings.MaxMasks;
                 bool silkOk = (bindings & Binding.Silk) == 0 || pd.CurrentSilkMax <= PantheonCatalog.Bindings.MaxSilk;
-                Check("束缚生效 / bindings in effect", Bindings.Active == bindings && needleOk && maskOk && silkOk && pd.health <= pd.CurrentMaxHealth,
-                    $"织针 / needle {pd.nailDamage}（原 / raw {raw}），面具 / masks {pd.health}/{pd.CurrentMaxHealth}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，Active={Bindings.Describe(Bindings.Active)}");
+                // 0.10.5：念珠、碎片无限以后，工具束缚照样要让所有攻击工具扔不出去（三个方向都没有绑定的工具，主角也拿不到要扔的工具）。
+                bool toolsOk = true;
+                string toolsNote = "";
+                if ((bindings & Binding.Tools) != 0)
+                {
+                    HeroController hc = HeroController.instance;
+                    int bound = new[] { AttackToolBinding.Neutral, AttackToolBinding.Up, AttackToolBinding.Down }
+                        .Count(d => ToolItemManager.GetBoundAttackTool(d, ToolEquippedReadSource.Active, out _) != null);
+                    bool willThrow = hc != null && hc.GetWillThrowTool(false);
+                    toolsOk = bound == 0 && !willThrow;
+                    toolsNote = $"，工具 / tools 能扔的方向 / throwable bindings {bound}，主角要扔 / hero will throw {willThrow}，念珠 / rosaries {pd.geo}，碎片 / shards {pd.ShellShards}";
+                }
+                Check("束缚生效 / bindings in effect", Bindings.Active == bindings && needleOk && maskOk && silkOk && toolsOk && pd.health <= pd.CurrentMaxHealth,
+                    $"织针 / needle {pd.nailDamage}（原 / raw {raw}），面具 / masks {pd.health}/{pd.CurrentMaxHealth}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，Active={Bindings.Describe(Bindings.Active)}{toolsNote}");
             }
             else if (!rested && carried >= 0)
             {
@@ -1965,6 +2010,20 @@ internal sealed partial class DebugTools : MonoBehaviour
                 else
                 {
                     row.Note += (row.Note.Length > 0 ? "; " : "") + $"纹章 / crest {pd.CurrentCrestID}（休息点换成 / swapped to {expectCrest}）";
+                }
+            }
+            if (i > 0 && HeroController.SilentInstance is HeroController heroNow)
+            {
+                // 上一场的演出不能把运动学刚体、隐身、无敌、无限空跳带进这一场（0.10.5：崇高圣母灵丝之后是第五万神殿最后一场）。
+                heroChecks++;
+                List<string> heroBad = HeroCheck.Problems(heroNow, full: false);
+                if (heroBad.Count == 0)
+                {
+                    heroOk++;
+                }
+                else
+                {
+                    row.Note += (row.Note.Length > 0 ? "; " : "") + $"主角状态 / hero state: {string.Join("、", heroBad)}（{HeroCheck.State(heroNow)}）";
                 }
             }
             if (blueSet >= 0)
@@ -2104,6 +2163,10 @@ internal sealed partial class DebugTools : MonoBehaviour
         {
             Check("蓝血带到下一场 / blue health carried", blueOk == blueChecks, $"{blueOk}/{blueChecks}");
         }
+        if (heroChecks > 0)
+        {
+            Check("每场进场时主角状态正常 / hero state normal at each fight", heroOk == heroChecks, $"{heroOk}/{heroChecks}");
+        }
 
         // 4. 回到门前：结算（完成时）、记录、束缚解开。
         if (abort == null)
@@ -2167,6 +2230,15 @@ internal sealed partial class DebugTools : MonoBehaviour
                 PantheonDoor? back = Sanctum.FindDoor(p.Id);
                 float hx = HeroController.instance.transform.position.x;
                 Check("站回门前 / back at the door", back != null && Mathf.Abs(hx - (back.X - 3.6f * back.Size)) < 1.5f, back != null ? $"x={hx:0.0}，门 / door {back.X:0.0}" : "没有门 / no door");
+            }
+            if (mc.State == LoomState.Lobby)
+            {
+                // 结算界面关掉、人站回门前以后才测：结算期间人本来就不能动（0.10.5 第一次 p1：放在结算弹出之前，
+                // 测的时候结算还拿着操作，判“没站稳、不能操作”，刚体和重力都正常）。站回门前的检查要在这之前，落地检查会把人抬高。
+                yield return WaitFor(LobbyReady, 30f);
+                var fall = new HeroCheck.Result();
+                yield return Beating(HeroCheck.Fall(fall));
+                Check("回大厅能正常落地 / hero falls normally back in the lobby", fall.Ok, fall.Detail);
             }
             yield return Shots.Capture(Path.Combine(shotDir, "90-door-after.jpg"), junk);
             LogDoorView("after");
@@ -2245,8 +2317,8 @@ internal sealed partial class DebugTools : MonoBehaviour
             sb.AppendLine();
             sb.AppendLine("- 做法 / method: 从入场门 door_dreamEnter 进原场景（加载时已改成神居版：封出口、清交互、表里的 FSM 补丁、BossSceneController 判胜）；自检不替玩家触发、不用兜底击杀；每击最多四分之一血。截图在 shots/" + reportStamp);
             sb.AppendLine();
-            sb.AppendLine("| # | Boss | id | 进场 | 自己开战 | 找到 Boss | 击杀判定 | 打完干净 | 回圣所 | 场地 | 开战方式 | 用时(s) | 截图 | 备注 |");
-            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+            sb.AppendLine("| # | Boss | id | 进场 | 自己开战 | 找到 Boss | 击杀判定 | 打完干净 | 回圣所 | 落地 | 场地 | 开战方式 | 用时(s) | 截图 | 备注 |");
+            sb.AppendLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
             for (int i = 0; i < rows.Count; i++)
             {
                 Row r = rows[i];
@@ -2254,7 +2326,8 @@ internal sealed partial class DebugTools : MonoBehaviour
                 // 没测的写 N/A（放弃的那一场只测进场和回大厅；没看“打完干净”的也是），不写 PASS。
                 string T(bool v) => r.Abandon ? "N/A" : P(v);
                 string clean = r.Abandon || r.Clean == null ? "N/A" : P(r.Clean.Value);
-                sb.AppendLine($"| {i + 1} | {r.Boss.NameZh} | {r.Boss.Id} | {P(r.Entered)} | {T(r.Start)} | {T(r.Found)} | {T(r.Kill)} | {clean} | {P(r.Return)} | {C(r.Entry)} | {C(r.StartHow)} | {r.Seconds:0} | {r.Shots.Count} | {C(r.Note)} |");
+                string fall = r.Fall == null ? "N/A" : P(r.Fall.Value);
+                sb.AppendLine($"| {i + 1} | {r.Boss.NameZh} | {r.Boss.Id} | {P(r.Entered)} | {T(r.Start)} | {T(r.Found)} | {T(r.Kill)} | {clean} | {P(r.Return)} | {fall} | {C(r.Entry)} | {C(r.StartHow)} | {r.Seconds:0} | {r.Shots.Count} | {C(r.Note)} |");
             }
             if (extra.Count > 0)
             {
@@ -2264,6 +2337,16 @@ internal sealed partial class DebugTools : MonoBehaviour
                 foreach (string l in extra)
                 {
                     sb.AppendLine("- " + l.Replace("|", "/"));
+                }
+            }
+            if (resourceLines.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine($"## 资源 / resources（{(resourceFail ? "有 FAIL / has failures" : "全部 PASS / all pass")}）");
+                sb.AppendLine();
+                foreach (string l in resourceLines)
+                {
+                    sb.AppendLine(l.Replace("|", "/"));
                 }
             }
             if (arrival.Count > 0)

@@ -1984,7 +1984,8 @@
           {
             "path": "Boss Scene/Silk Boss",
             "fsm": "Phase Control",
-            "state": "Death Hit"
+            "state": "Death Hit",
+            "terminal": true
           }
         ],
         "keep": [
@@ -3387,8 +3388,8 @@
       },
       "arena": {
         "door": [
-          1.7,
-          29.9
+          4.3,
+          21.6
         ],
         "face": "right",
         "wake": {

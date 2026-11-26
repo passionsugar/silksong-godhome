@@ -15,7 +15,8 @@ namespace Godhome;
 /// [Godhome] 神居场地（第三版，见 docs/arena.md）：不新建地图，每次加载的原 Boss 场景就是一份新副本；
 /// 在 SceneManager.sceneLoaded（物体 Awake 已跑、Start 没跑、人没放进来、画面全黑）时用前作神居的手段把它改成神居版：
 /// 入场门 door_dreamEnter、场地控制器（游戏自己的 BossSceneController）、堵出口、关交互物体、按表给 FSM 打补丁、
-/// 特殊结局插 EndGGBossScene。运行时不猜任何东西：门在哪、等哪个 FSM、怎么结束都写在 data/bosses.json 的 arena 段。
+/// 特殊结局插 EndGGBossScene。门在哪、等哪个 FSM、怎么结束写在 data/bosses.json 的 arena 段；
+/// 双苔母另有一次限定于配置 BattleScene 的几何校验，避免落在堵出口的墙外。
 /// </summary>
 internal static class Arena
 {
@@ -118,6 +119,7 @@ internal static class Arena
     private static float enteredAt = -1f;
     private static bool missingReported;
     private static bool controllerLate;
+    private static bool mossEntryChecked;
 
     internal static int PatchCount => boss?.Arena.Patch.Count ?? 0;
     internal static int PatchesApplied => patchDone.Count;
@@ -194,6 +196,7 @@ internal static class Arena
         enteredAt = -1f;
         missingReported = false;
         controllerLate = false;
+        mossEntryChecked = false;
     }
 
     // ───────────────────────────── 加载时 ─────────────────────────────
@@ -830,6 +833,16 @@ internal static class Arena
             result = Bad($"没有状态 / no state '{e.State}'");
             return false;
         }
+        if (e.Terminal)
+        {
+            // 数据里标了 terminal 的结局状态（丝母 Death Hit）：判胜插最前面，原动作照样执行（停攻击、放开被抓的主角、Boss 无敌），
+            // 去掉出口，原版结局演出（会把主角刚体设成运动学）就不会开始。说明见 TerminalEndGGBossScene。
+            // InitData 后修改的是这个场景的 FSM 实例；未醒的模板上面已拒绝，不能改模板资产。
+            // 全局跳转此时仍供战斗阶段使用，到 terminal.OnEnter 才清掉；不能 Stop/Disable 整个 FSM 或 Boss。
+            TerminalEndGGBossScene.Install(st);
+            result = $"ok (terminal: {st.Actions.Length - 1} original actions kept, no exits)";
+            return true;
+        }
         // 只认排在最前面、启用的（Codex 审查 0.9.0 #11）：排在后面的可能在它之前就被别的动作跳走，停用的不执行。
         // 多一个也不会重复判胜：BossSceneController.EndBossScene 自己防重入（endedScene，反编译 BossSceneController.cs）。
         if (st.Actions.Length > 0 && st.Actions[0] is EndGGBossScene first && first.Enabled)
@@ -1017,7 +1030,10 @@ internal static class Arena
         {
             GodhomePlugin.Log.LogInfo(line);
             // 调试：进场几秒内有没有碰到伤害（撞 Boss、掉岩浆），只记日志。
-            ArrivalWatch.Begin(host, b, Landed.Value);
+            if (!MossMotherEntry.Applies(b))
+            {
+                ArrivalWatch.Begin(host, b, Landed.Value);
+            }
         }
         else
         {
@@ -1029,7 +1045,19 @@ internal static class Arena
             ReportMissing(b);
         }
         int mine = serial;
-        host.StartCoroutine(Arrive(host, b, () => mine == serial && host.State == LoomState.Fight && host.CurrentBoss == b));
+        GameManager gm = GameManager.UnsafeInstance;
+        PlayerData pd = PlayerData.instance;
+        SceneData? sd = gm != null ? gm.sceneData : null;
+        int slot = gm != null ? gm.profileID : -1;
+        TransitionPoint? entryDoor = Door;
+        // Delayed entry work owns this fight, hero, save data and door instance, not just a scene name.
+        bool Same() => mine == serial && host.State == LoomState.Fight && host.CurrentBoss == b
+            && gm != null && GameManager.UnsafeInstance == gm && gm.profileID == slot
+            && ReferenceEquals(PlayerData.instance, pd) && ReferenceEquals(gm.playerData, pd) && ReferenceEquals(gm.sceneData, sd)
+            && GodhomeSave.IsGodhome(gm) && !SaveGuard.BlockAll && !SaveGuard.Stale(gm)
+            && hero != null && HeroController.SilentInstance == hero && !hero.cState.dead
+            && entryDoor != null && Door == entryDoor;
+        host.StartCoroutine(Arrive(host, b, Same));
         return true;
     }
 
@@ -1046,7 +1074,7 @@ internal static class Arena
     ///    对和人重叠、属于本场地的 BattleScene 触发区（启用的）补发一次。
     /// 2. PlayMaker 的 Trigger2dEvent 只在“等进入”的那个状态里才挂上监听（OnEnter 里 AddCallback，反编译 Trigger2dEvent.cs），
     ///    FSM 常常要等人就位（WaitForHeroInPosition）才走到这个状态，比如第四圣咏团的 Remeet Ready。见 FsmEnters。
-    /// 不挑位置、不猜触发区，开不开战仍由 BattleScene / FSM 自己判断，等于玩家刚走进来。
+    /// 除双苔母的一次几何校验外不改位置；触发区来自明确配置，开不开战仍由 BattleScene / FSM 自己判断。
     /// </summary>
     private static IEnumerator Arrive(ModeController host, BossDef b, Func<bool> same)
     {
@@ -1072,6 +1100,31 @@ internal static class Arena
         }
         HeroController hero = HeroController.SilentInstance;
         Collider2D? heroCol = hero != null ? hero.GetComponent<Collider2D>() : null;
+        if (MossMotherEntry.Applies(b) && !mossEntryChecked)
+        {
+            while (same() && Paused())
+            {
+                yield return null;
+            }
+            if (!same() || mossEntryChecked)
+            {
+                yield break;
+            }
+            mossEntryChecked = true;
+            // FindGroundPoint has finished, exit walls exist, and physics has seen them. Repair
+            // only now, before replaying the entry trigger, so vanilla placement cannot undo it.
+            if (hero == null || !hero.isHeroInPosition || heroCol == null || Door == null
+                || !RepairMossMotherEntry(b, hero, heroCol, same))
+            {
+                if (same())
+                {
+                    MarkFatal(serial, "双苔母入场位置无法安全确认 / could not verify a safe Weavenest pair entry");
+                }
+                yield break;
+            }
+            Landed = hero.transform.position;
+            ArrivalWatch.Begin(host, b, Landed.Value);
+        }
         if (hero == null || !hero.isHeroInPosition || heroCol == null)
         {
             GodhomePlugin.Log.LogWarning($"[Godhome]   人没就位，不补发进入 / hero not in position; no enter re-sent ({b.Id})");
@@ -1123,6 +1176,60 @@ internal static class Arena
         if (b.Arena.Enter.Count > 0 && same())
         {
             yield return EnterSteps(b, same);
+        }
+    }
+
+    private static bool RepairMossMotherEntry(BossDef b, HeroController hero, Collider2D heroCol, Func<bool> same)
+    {
+        try
+        {
+            TransitionPoint? door = Door;
+            if (door == null || b.Arena.Door is not Vector2 preferred)
+            {
+                return false;
+            }
+            bool found = MossMotherEntry.TryFind(hero, heroCol, door, wakeBattle, preferred, out Vector2 target, out string detail);
+            if (!same())
+            {
+                return false;
+            }
+            if (!found)
+            {
+                // 表里的门（0.10.5 改到场内地面 (4.3, 21.6)，实机落在 (4.3, 20.6)）本身就是场内落点；校验找不到
+                // “完全干净”的位置（比如开场时小飞虫正好贴着人）不该把整场判成场地故障，只记下来，人留在门前。
+                GodhomePlugin.Log.LogWarning($"[Godhome] 双苔母落点校验没通过，留在表里的门前 / Weavenest pair entry not verified, staying at the configured door {Fmt(hero.transform.position)}: {detail}");
+                return true;
+            }
+            Vector3 was = hero.transform.position;
+            if (Vector2.SqrMagnitude((Vector2)was - target) > 0.0001f)
+            {
+                hero.transform.position = new Vector3(target.x, target.y, was.z);
+                if (hero.Body != null)
+                {
+                    hero.Body.linearVelocity = Vector2.zero;
+                }
+                // The child hazard marker follows the repaired door. Also update the hero's
+                // already-copied hazard respawn so falling later cannot restore the bad entry.
+                door.transform.position = new Vector3(target.x, target.y, door.transform.position.z);
+                hero.SetHazardRespawn(hero.transform.position, b.Arena.Face > 0);
+                Physics2D.SyncTransforms();
+                GameCameras cams = GameCameras.SilentInstance;
+                if (cams != null && cams.cameraController != null)
+                {
+                    cams.cameraController.PositionToHero(false);
+                }
+                GodhomePlugin.Log.LogWarning($"[Godhome] 双苔母落点已修复 / Weavenest pair entry repaired: {Fmt(was)} → {Fmt(target)}; {detail}");
+            }
+            else
+            {
+                GodhomePlugin.Log.LogInfo($"[Godhome] 双苔母落点校验 / Weavenest pair entry verified: {Fmt(target)}; {detail}");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 双苔母落点校验出错，留在表里的门前 / Weavenest pair entry check failed, staying at the configured door: {Bad(ex.Message)}");
+            return same();
         }
     }
 

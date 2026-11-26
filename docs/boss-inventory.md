@@ -114,7 +114,7 @@
 | `summoned_saviour` | 蒙召救主 | Summoned Saviour | Boss | 髓骨洞窟 | `Bone_Steel_Servant` | `Bone_Steel_Servant @ (26.5, 6.5)` | 500 | `待查` |
 | `tormented_trobbio` | 痛苦的特罗比奥 | Tormented Trobbio | Boss | 圣堡 | `Library_13` | `Library_13 @ (69.5, 15.6)` | 950 | `defeatedTormentedTrobbio` |
 | `skull_tyrant_invasion` | 颅骨暴君（入侵骸底镇） | Skull Tyrant (Bone Bottom Invasion) | Boss | 骸底镇 | `Bonetown_boss<br>← Bonetown` | `Bonetown @ (235.6, 9.0)` | 450 | `skullKingKilled` |
-| `moss_mother_duo` | 苔藓之母（织巢双生） | Moss Mother (Weavenest Pair) | Boss | 阿特拉织巢 | `Weave_03` | `Weave_03 @ (1.7, 29.9)` | 350 / 350 | `待查` |
+| `moss_mother_duo` | 苔藓之母（织巢双生） | Moss Mother (Weavenest Pair) | Boss | 阿特拉织巢 | `Weave_03` | `Weave_03 @ (4.3, 21.6)` | 350 / 350 | `待查` |
 | `huge_flea` | 巨蚤 | Huge Flea | 小 Boss | 圣堡 | `Arborium_08` | `Arborium_08 @ (33.7, 34.5)` | 200 | `tamedGiantFlea` |
 | `lost_lace` | 失心蕾丝 | Lost Lace | Boss | 深渊 | `Abyss_Cocoon` | `Abyss_Cocoon @ (46.0, 8.0)` | 1800 | `待查` |
 

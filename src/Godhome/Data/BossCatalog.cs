@@ -147,7 +147,7 @@ internal sealed class ArenaDef
     /// <summary>加载时（FSM 还没开始跑）对场景的改动，相当于前作 Boss FSM 里的神居分支。</summary>
     public List<ArenaPatch> Patch = new();
 
-    /// <summary>特殊结局：在这些状态最前面插 EndGGBossScene。写了就不用 BossSceneController.bosses 判胜。</summary>
+    /// <summary>特殊结局：在这些状态最前面插 EndGGBossScene；terminal 为真时截断原版结局。写了就不用 bosses 判胜。</summary>
     public List<FsmRef> End = new();
 
     /// <summary>进场后（人站好、能操作时）按顺序执行的步骤，相当于前作 Dream Entry 的最后几步。</summary>
@@ -204,8 +204,10 @@ internal sealed class FsmRef
     public string Path = "";
     public string Fsm = "";
     public string State = "";
+    /// <summary>只执行神居判胜，清除该状态的原动作和后续跳转，避免继续进入原版结局。</summary>
+    public bool Terminal;
 
-    public override string ToString() => $"{Path}::{Fsm} [{State}]";
+    public override string ToString() => $"{Path}::{Fsm} [{State}]{(Terminal ? " (terminal)" : "")}";
 }
 
 /// <summary>
@@ -613,7 +615,19 @@ internal static class BossCatalog
                 GodhomePlugin.Log.LogWarning($"[Godhome] {id}: {section} 里有一项要写 path 和 state / an item needs path and state: {x.ToString(Newtonsoft.Json.Formatting.None)}");
                 continue;
             }
-            list.Add(new FsmRef { Path = Str(s, "path")!, Fsm = Str(s, "fsm") ?? "", State = Str(s, "state")! });
+            JToken? terminal = s["terminal"];
+            if (terminal != null && terminal.Type != JTokenType.Boolean)
+            {
+                // 截断原版结局是安全要求，不能将拼错的 true 当作 false 后继续开战。
+                bad++;
+                GodhomePlugin.Log.LogWarning($"[Godhome] {id}: {section}.terminal 必须是布尔值 / terminal must be a boolean: {terminal.ToString(Newtonsoft.Json.Formatting.None)}");
+                continue;
+            }
+            list.Add(new FsmRef
+            {
+                Path = Str(s, "path")!, Fsm = Str(s, "fsm") ?? "", State = Str(s, "state")!,
+                Terminal = terminal?.Value<bool>() ?? false,
+            });
         }
         return list;
     }

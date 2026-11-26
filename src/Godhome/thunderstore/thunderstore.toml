@@ -2,40 +2,36 @@
 schemaVersion = "0.0.1"
 
 [package]
-# The name of the team you are publishing as
-namespace = "local"
+# Thunderstore team / package namespace (the team the service account belongs to).
+namespace = "passionsugar"
+# Package name: the plugin's AssemblyTitle (Directory.Build.props). The version is passed on the command line
+# (scripts/thunderstore-package.ps1 takes it from the release tag and checks it against the dll).
+name = "Godhome"
 # max 250 characters
 description = "Boss revisits and pantheon boss rushes in a separate save; optionally uses Hollow Knight's Godhome scenes."
-
-# Replace this with a correct repo URL if the default is not accurate
 websiteUrl = "https://github.com/passionsugar/silksong-godhome"
 containsNsfwContent = false
 
 
-# dependencies are specified in the format AuthorName-PackageName = "version". You should always have at least BepInExPack_Silksong.
 # [Godhome] DataManager、I18N 是硬依赖（GodhomePlugin 的 BepInDependency 没写 SoftDependency）：不写进来，管理器不会自动装，
 # BepInEx 缺依赖时整个跳过 Godhome（Codex 审计 0.10.3 F01）。UnitySceneRepacker 是可选的（软依赖），不写。
+# BepInEx 用 silksong_modding 的包：旧的 BepInEx-BepInExPack_Silksong 已标记弃用，最新版只是转到这个包（2026-11-27 查 Thunderstore API）。
 [package.dependencies]
 silksong_modding-BepInExPack_Silksong = "1.0.3"
 silksong_modding-DataManager = "1.2.2"
 silksong_modding-I18N = "1.1.1"
 
 
-# in most cases you should not change this build block, or the first build.copy block; the dist and tmp directories are used
-# by other build scripts
+# Paths are relative to this file. scripts/thunderstore-package.ps1 fills ./temp from the GitHub release archive
+# (plugins/ = the archive's BepInEx/plugins/Godhome, plus CHANGELOG.md at the root), so the published dll is the released one.
 [build]
 icon = "./icon.png"
-readme = "../README.md"
+readme = "./README.md"
 outdir = "./dist"
 
 [[build.copy]]
 source = "./temp"
 target = "/"
-
-# additional files and directories can be added to the package like this:
-# [[build.copy]]
-# source = "./CHANGELOG.md"
-# target = "/"
 
 
 [publish]
@@ -43,5 +39,5 @@ repository = "https://thunderstore.io"
 communities = [ "hollow-knight-silksong" ]
 
 [publish.categories]
-# available categories can be found at https://github.com/thunderstore-io/ecosystem-schema/blob/master/games/data/hollow-knight-silksong.yml
-hollow-knight-silksong = [ "mods" ]
+# Categories: https://thunderstore.io/api/experimental/community/hollow-knight-silksong/category/
+hollow-knight-silksong = [ "mods", "boss" ]

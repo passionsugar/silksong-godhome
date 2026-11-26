@@ -53,6 +53,9 @@ try {
     [IO.File]::WriteAllText((Join-Path $root 'install.bat'), $bat.Replace("`r`n", "`n").Replace("`n", "`r`n"), [Text.Encoding]::ASCII)
     $unbat = [IO.File]::ReadAllText((Join-Path $Godhome.Root 'packaging\uninstall.bat'), [Text.Encoding]::ASCII)
     [IO.File]::WriteAllText((Join-Path $root 'uninstall.bat'), $unbat.Replace("`r`n", "`n").Replace("`n", "`r`n"), [Text.Encoding]::ASCII)
+    # 修改记录（0.10.5 起；发布说明里提到它）。和 README.txt 一样写成 UTF-8 带 BOM、CRLF，记事本能直接看。
+    $changes = [IO.File]::ReadAllText((Join-Path $Godhome.Root 'CHANGELOG.md'), [Text.Encoding]::UTF8)
+    [IO.File]::WriteAllText((Join-Path $root 'CHANGELOG.md'), $changes.Replace("`r`n", "`n").Replace("`n", "`r`n"), (New-Object Text.UTF8Encoding $true))
 
     "---- 压缩 / zip"
     $outDir = Join-Path $Godhome.Root 'builds'
