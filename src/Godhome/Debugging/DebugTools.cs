@@ -81,6 +81,7 @@ internal sealed partial class DebugTools : MonoBehaviour
             GodhomePlugin.Log.LogWarning($"[Godhome] 调试组件{why}，停止自检 / debug tools {why}, stopping the self-test");
         }
         StopSelfTest();
+        StopPromo(why);
         // 巡视截图途中被停：把改画进临时图的镜头还原（Codex 审查 v0.7.0 #6）。
         Shots.RestoreCameras();
         if (weSetInvincible)
@@ -156,6 +157,9 @@ internal sealed partial class DebugTools : MonoBehaviour
             StopSelfTest();
             SelfTestStatus = "中止 / aborted (debug off or slot)";
         }
+        // 宣传片：调试关了、槽不允许了、换了档就停（调试关着时也要跑这一步，Codex 审计 0.10.3 D03）。看门狗也在这里跑。
+        PromoGuard();
+        PromoWatchdog();
         UpdateInvincible(mc);
         if (!DebugOn)
         {
@@ -185,7 +189,6 @@ internal sealed partial class DebugTools : MonoBehaviour
         {
             TickPromo(GameManager.UnsafeInstance);
         }
-        PromoWatchdog();
     }
 
     /// <summary>
@@ -821,7 +824,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         if (!Allowed())
         {
             GodhomePlugin.Log.LogWarning("[Godhome] 自检被拒绝：当前存档槽不在 Safety.EnabledSlots / self-test refused on this slot");
-            ModeController.Instance?.ShowBanner(L.Get("DEBUG_SLOT_REFUSED"), 4f);
+            ModeController.Instance?.ShowNotice(L.Get("DEBUG_SLOT_REFUSED"), 4f);
             return;
         }
         string pan = GodhomeConfig.SelfTestPantheon.Value?.Trim() ?? "";
@@ -1174,6 +1177,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         SelfTestRunning = true;
         rows.Clear();
         extra.Clear();
+        ArrivalWatch.Reset();
         planned = list.Count;
         reportStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         string shotDir = Path.Combine(Paths.BepInExRootPath, "Godhome", "shots", reportStamp);
@@ -1473,6 +1477,45 @@ internal sealed partial class DebugTools : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 万神殿自检在休息点换一个别的纹章（模拟玩家坐长椅换配装，测 Codex 审计 0.10.3 F03），返回换上的纹章 id；换不了返回 null（不测）。
+    /// 和物品栏里换纹章一样：AutoEquip 换上、发配装改变事件。
+    /// </summary>
+    private static string? SwapCrestForTest()
+    {
+        try
+        {
+            PlayerData pd = PlayerData.instance;
+            string cur = pd.CurrentCrestID;
+            List<ToolCrest> all = ToolItemManager.GetAllCrests();
+            ToolCrest? pick = null;
+            foreach (string want in new[] { "Reaper", "Wanderer", "Warrior", "Toolmaster", "Spell" })
+            {
+                pick = all.FirstOrDefault(c => c != null && c.name == want && c.IsUnlocked && c.name != cur);
+                if (pick != null)
+                {
+                    break;
+                }
+            }
+            pick ??= all.FirstOrDefault(c => c != null && c.IsVisible && c.IsUnlocked && !c.IsHidden && c.name != cur);
+            if (pick == null)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 自检：没有别的纹章可换，不测配装 / self-test: no other crest to swap to (current {cur})");
+                return null;
+            }
+            ToolItemManager.AutoEquip(pick, false, false);
+            ToolItemManager.SendEquippedChangedEvent(force: true);
+            bool ok = pd.CurrentCrestID == pick.name;
+            GodhomePlugin.Log.LogInfo($"[Godhome] 自检在休息点换纹章 / self-test swapped the crest at the rest stop: {cur} → {pd.CurrentCrestID}{(ok ? "" : $"（没换上 / did not take: {pick.name}）")}");
+            return ok ? pick.name : null;
+        }
+        catch (Exception e)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 自检换纹章出错，不测配装 / self-test crest swap failed: {e.Message}");
+            return null;
+        }
+    }
+
     private static bool Passed(Row r) => r.Abandon
         ? r.Entered && r.Return
         : r.Entered && r.Start && r.Found && r.Kill && r.Clean != false && r.Return;
@@ -1597,6 +1640,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         SelfTestRunning = true;
         rows.Clear();
         extra.Clear();
+        ArrivalWatch.Reset();
         planned = abortAt > 0 ? Mathf.Min(abortAt, p.Bosses.Count) : p.Bosses.Count;
         reportStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         string shotDir = Path.Combine(Paths.BepInExRootPath, "Godhome", "shots", reportStamp);
@@ -1830,6 +1874,12 @@ internal sealed partial class DebugTools : MonoBehaviour
         bool abandoned = false;
         int carried = -1;
         int carryOk = 0, carryChecks = 0;
+        // Codex 审计 0.10.3 F03 / F04：休息点换的纹章要带到之后的每一场、回大厅变回开殿前的；直接接下一场时蓝血要带过去。
+        string crestAtStart = PlayerData.instance.CurrentCrestID;
+        string? expectCrest = null;
+        int crestOk = 0, crestChecks = 0;
+        int blueSet = -1;
+        int blueOk = 0, blueChecks = 0;
         for (int i = 0; abort == null && i < p.Bosses.Count; i++)
         {
             BossDef b = p.Bosses[i];
@@ -1872,6 +1922,8 @@ internal sealed partial class DebugTools : MonoBehaviour
                 {
                     yield return SpaBenchTest(shot, row.Shots);
                 }
+                // 像玩家在长椅上那样换个纹章（第一次休息点换一次），看之后每一场都还是它。
+                expectCrest ??= SwapCrestForTest();
                 mc.DebugLeaveRest();
                 yield return WaitFor(() => mc.State is LoomState.Fight or LoomState.Lobby || !Allowed(), timeout + 30f);
             }
@@ -1902,6 +1954,31 @@ internal sealed partial class DebugTools : MonoBehaviour
                     carryOk++;
                 }
                 row.Note = $"带过来的血 / carried hp {pd.health}（上一场结束 / end of last {carried}）";
+            }
+            if (expectCrest != null)
+            {
+                crestChecks++;
+                if (pd.CurrentCrestID == expectCrest)
+                {
+                    crestOk++;
+                }
+                else
+                {
+                    row.Note += (row.Note.Length > 0 ? "; " : "") + $"纹章 / crest {pd.CurrentCrestID}（休息点换成 / swapped to {expectCrest}）";
+                }
+            }
+            if (blueSet >= 0)
+            {
+                if (!rested)
+                {
+                    blueChecks++;
+                    if (pd.healthBlue == blueSet)
+                    {
+                        blueOk++;
+                    }
+                    row.Note += (row.Note.Length > 0 ? "; " : "") + $"蓝血 / blue {pd.healthBlue}（上一场结束 / end of last {blueSet}）";
+                }
+                blueSet = -1;
             }
             List<string> scenes = ModeController.ScenesOf(b);
             ResetPeaks();
@@ -1983,6 +2060,14 @@ internal sealed partial class DebugTools : MonoBehaviour
             }
             row.Note += $"; 判定 / by {mc.LastWinHow}";
             carried = PlayerData.instance.health;
+            // 蓝血：赢了、还没离开这一场时给 2 格，看下一场还在不在（下一场前是休息点的不看：长椅照游戏的规矩清掉）。
+            // 胜利转场已经把连战推到下一场的不给（那就是在下一场里给的，测不出东西）。
+            // 直接改数，不发 UPDATE BLUE HEALTH：丝之歌里那个事件是“清零”（HUD 的 Blue Health Control → GameManager.UpdateBlueHealth）。
+            if (!advanced && mc.State == LoomState.Won && i < p.Bosses.Count - 1)
+            {
+                PlayerData.instance.healthBlue = 2;
+                blueSet = 2;
+            }
             // 等的时间要盖过运行时的兜底回程（ModeController.WonTimeout），不然兜底能正常走的也报卡住（Codex 审查 0.9.0 #13）。
             // 等的同时看倒下后还有没有活着的本体（和单场一样，Codex 审查 0.9.0 第二轮 #10）；胜利转场已经走了的看不到，写 N/A。
             var cleanWatch = new CleanWatch(hadHms);
@@ -2011,12 +2096,26 @@ internal sealed partial class DebugTools : MonoBehaviour
         {
             Check("血带到下一场 / health carried", carryOk == carryChecks, $"{carryOk}/{carryChecks}");
         }
+        if (crestChecks > 0)
+        {
+            Check("休息点换的纹章带到之后各场 / crest from the rest stop kept", crestOk == crestChecks, $"{expectCrest}：{crestOk}/{crestChecks}");
+        }
+        if (blueChecks > 0)
+        {
+            Check("蓝血带到下一场 / blue health carried", blueOk == blueChecks, $"{blueOk}/{blueChecks}");
+        }
 
         // 4. 回到门前：结算（完成时）、记录、束缚解开。
         if (abort == null)
         {
             yield return WaitFor(() => mc.State == LoomState.Lobby && (hk1 ? Lobby.Ready : Sanctum.Built), 90f);
             Check("回到大厅 / back in the lobby", mc.State == LoomState.Lobby, $"state={mc.State}");
+            if (expectCrest != null)
+            {
+                // 连战结束，配装和别的改动一样回到开殿前（RunGear 的约定）。
+                Check("回大厅纹章变回开殿前的 / crest back to the pre-run one", PlayerData.instance.CurrentCrestID == crestAtStart,
+                    $"{PlayerData.instance.CurrentCrestID}（开殿前 / before the run {crestAtStart}）");
+            }
             yield return Shots.Capture(Path.Combine(shotDir, "79-door-arrive.jpg"), junk);
             LogDoorView("arrive");
             // 放弃的那一场：回到了大厅、而且连战是因为这次自检放弃作废的（场次和原因都对得上）才算这一行通过
@@ -2134,6 +2233,11 @@ internal sealed partial class DebugTools : MonoBehaviour
             sb.AppendLine($"- 存档槽 / slot: {GameManager.UnsafeInstance?.profileID}");
             int pass = rows.Count(Passed);
             sb.AppendLine($"- 全部通过 / all pass: {pass}/{rows.Count}（计划 / planned {planned}）");
+            // 进场挨打不算失败（自检开着无敌），但要写进报告，不能只在日志里（Codex 审计 0.10.3 第 6.4 节）。
+            IReadOnlyList<string> arrival = ArrivalWatch.Flagged;
+            sb.AppendLine(arrival.Count == 0
+                ? $"- 进场检查 / arrival: 没有场次进场 {ArrivalWatch.Window:0} 秒内碰到伤害 / no damage on arrival"
+                : $"- 进场检查 / arrival: **警告 / WARN** {arrival.Count} 场进场 {ArrivalWatch.Window:0} 秒内碰到伤害，其中 {ArrivalWatch.FlaggedBeforeControl} 场在恢复操作前（玩家躲不开，要改落点）/ {arrival.Count} fights hit on arrival, {ArrivalWatch.FlaggedBeforeControl} before control（见下面 / see below）");
             if (abort != null)
             {
                 sb.AppendLine($"- 中止 / aborted: {abort}");
@@ -2158,6 +2262,16 @@ internal sealed partial class DebugTools : MonoBehaviour
                 sb.AppendLine("## 万神殿 / pantheon");
                 sb.AppendLine();
                 foreach (string l in extra)
+                {
+                    sb.AppendLine("- " + l.Replace("|", "/"));
+                }
+            }
+            if (arrival.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("## 进场挨打 / arrival hits");
+                sb.AppendLine();
+                foreach (string l in arrival)
                 {
                     sb.AppendLine("- " + l.Replace("|", "/"));
                 }

@@ -66,18 +66,37 @@ public partial class GodhomePlugin : BaseUnityPlugin, ISaveDataMod<GodhomeSaveDa
         nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace), nameof(ArrivalDamagePatch),
     };
 
-    /// <summary>和 Harmony.PatchAll 一样逐个类打补丁（出错照样抛出、插件不加载），只是调试关着时跳过调试补丁。</summary>
+    /// <summary>
+    /// 和 Harmony.PatchAll 一样逐个类打补丁（出错照样抛出、插件不加载），只是调试关着时跳过调试补丁。
+    /// 中途有一个打不上：已经打上的全部撤掉再抛出（Codex 审计 0.10.3：不留半套补丁改着菜单、存档，组件也不会挂上）。
+    /// </summary>
     private void PatchAll()
     {
         var harmony = new Harmony(Id);
         bool debug = GodhomeConfig.DebugMode.Value;
-        foreach (Type t in AccessTools.GetTypesFromAssembly(typeof(GodhomePlugin).Assembly))
+        try
         {
-            if (!debug && DebugOnlyPatches.Contains(t.Name))
+            foreach (Type t in AccessTools.GetTypesFromAssembly(typeof(GodhomePlugin).Assembly))
             {
-                continue;
+                if (!debug && DebugOnlyPatches.Contains(t.Name))
+                {
+                    continue;
+                }
+                harmony.CreateClassProcessor(t).Patch();
             }
-            harmony.CreateClassProcessor(t).Patch();
+        }
+        catch (Exception e)
+        {
+            Log.LogError($"[Godhome] 补丁打不上，已撤掉全部补丁，插件不加载 / a patch failed; all patches were removed and the plugin is not loaded: {e}");
+            try
+            {
+                harmony.UnpatchSelf();
+            }
+            catch (Exception u)
+            {
+                Log.LogError($"[Godhome] 撤补丁出错 / unpatching failed: {u}");
+            }
+            throw;
         }
     }
 }

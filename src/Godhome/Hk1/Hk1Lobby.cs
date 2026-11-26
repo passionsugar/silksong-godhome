@@ -507,9 +507,9 @@ internal static class Hk1Lobby
             }
             HeroController hero = HeroController.SilentInstance;
             Renderer? hr = hero != null ? hero.GetComponent<Renderer>() : null;
-            if (hr != null)
+            if (hr != null && hero != null)
             {
-                sb.Append($" hero sorting={hr.sortingLayerName}({hr.sortingLayerID})/{hr.sortingOrder} z={hero.transform.position.z:0.000} mat={(hr.sharedMaterial != null ? hr.sharedMaterial.shader.name + "/q" + hr.sharedMaterial.renderQueue : "-")};");
+                sb.Append($" hero sorting={hr.sortingLayerName}({hr.sortingLayerID})/{hr.sortingOrder} z={hero.transform.position.z:0.000} mat={(hr.sharedMaterial != null ? (hr.sharedMaterial.shader != null ? hr.sharedMaterial.shader.name : "-") + "/q" + hr.sharedMaterial.renderQueue : "-")};");
             }
             // 场景的光：前作场景管理器带来的值、现在实际的环境光和饱和度、角色暗角的等级（整张图发暗时看这个）。
             CustomSceneManager? csm = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<CustomSceneManager>(true)).FirstOrDefault();

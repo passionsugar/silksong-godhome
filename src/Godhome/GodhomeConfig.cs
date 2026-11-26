@@ -60,8 +60,8 @@ internal static class GodhomeConfig
         DebugPromoMuteMusic = cfg.Bind("Debug", "PromoMuteMusic", true,
             "调试用：录宣传片时把游戏音乐调成静音（只在运行时改混音器，不改设置），只录音效。\nDebug: mute the game's music while recording the promo (runtime mixer only, settings untouched), so only sound effects are recorded.");
         DebugProbe = cfg.Bind("Debug", "Probe", "",
-            "调试用：探针，只记日志。逗号分隔：hud（HUD 的显示状态和谁改的）、audio（每秒的输出音量、场景的音频快照）、arena=场景名前缀（进场后大黄蜂的位置、附近地面、FSM 状态变化）。留空 = 关。\n" +
-            "Debug: probes that only log. Comma separated: hud (HUD visibility and who changed it), audio (output level every second, the scene's audio snapshots), arena=<scene prefix> (hero position, nearby ground and FSM state changes after entering). Empty = off.");
+            "调试用：探针，只记日志。逗号分隔：hud（HUD 的显示状态和谁改的）、audio（每秒的输出音量、场景的音频快照）、arena=场景名前缀（进场后大黄蜂的位置、附近地面、FSM 状态变化）。留空 = 关。改了要重启游戏（运行中改了探针就停下）。\n" +
+            "Debug: probes that only log. Comma separated: hud (HUD visibility and who changed it), audio (output level every second, the scene's audio snapshots), arena=<scene prefix> (hero position, nearby ground and FSM state changes after entering). Empty = off. Restart the game after changing it (a change at runtime stops the probe).");
         DebugHk1Tour = cfg.Bind("Debug", "Hk1Tour", false,
             "调试用：自动读档进前作的神居后巡视一遍（门、挑战界面、开一次万神殿、手办屋的雕像、拉杆、从雕像开一场、走回前厅和屋顶）并截图。\n" +
             "Debug: after the auto-load into Hollow Knight's Godhome, tour it (doors, challenge UIs, one pantheon start, the Hall of Gods statues, a lever, a statue fight, walking back to the atrium and roof) taking screenshots.");
@@ -83,8 +83,8 @@ internal static class GodhomeConfig
             "前作（空洞骑士）的安装目录（里面有 hollow_knight_Data）。留空 = 自动找（和丝之歌同一个 steamapps\\common，或各个盘的 Steam 库）。\n" +
             "Hollow Knight install folder (the one containing hollow_knight_Data). Empty = look for it next to Silksong or in the Steam libraries on each drive.");
         LoomKey = cfg.Bind("General", "LoomKey", new KeyboardShortcut(KeyCode.F6),
-            "织忆键：在神居存档的大厅里打开/关闭名录。\n" +
-            "Loom key: opens/closes the list in the lobby of a godhome save.");
+            "织忆键：只在调试模式下有用，战斗中按它放弃这一场（0.7.0 起没有名录了：在大厅里走到雕像、万神殿的门前按上）。\n" +
+            "Loom key: only used in debug mode, to abandon the current fight (there has been no list since 0.7.0: walk up to a statue or pantheon door in the lobby and press up).");
 
         EnabledSlots = cfg.Bind("Safety", "EnabledSlots", "3",
             "调试功能只在这些存档槽生效（逗号分隔，例如 \"3,4\"；写 all 表示所有槽；留空表示一个槽都不开）。开发期间默认只开槽 3（神居存档的测试槽）。神居存档本身不受这项限制。\n" +

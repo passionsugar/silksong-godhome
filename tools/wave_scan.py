@@ -34,6 +34,7 @@ def main():
         return cache[scene]
 
     draft = {}
+    bad = set()
     out = ["# BattleScene 波次（离线，要人核对）", ""]
     for b in bosses:
         bid = b["id"]
@@ -71,12 +72,20 @@ def main():
                 if "BattleScene" not in o["comps"]:
                     continue
                 waves = []
+                incomplete = False
                 for d in o["details"]:
                     if d.startswith("BattleScene:"):
                         m = WAVES_RE.search(d)
                         if m:
                             waves = [w.split("<")[0].strip() for w in m.group(1).split(",") if w.strip()]
+                        # 旧版导出会把长数组截成 12 个加 …(+N)、长行截断：波次不全，不能出 skipWaves 草稿
+                        # （Codex 审计 0.10.3 PT05：以前把 …(+1) 当成一波，真正的最后一波丢了）。
+                        incomplete = (m is None and "waves=[" in d) or any("…(+" in w for w in waves) or "truncated" in d
                         break
+                if incomplete:
+                    lines.append(f"- [{s}] `{path}`：**波次列表不完整（导出被截断），不出草稿**，用新版 dump_fsm.py 重新导出")
+                    bad.add(bid)
+                    continue
                 if not waves:
                     continue
                 boss_wave = None
@@ -105,11 +114,17 @@ def main():
             out.append(f"## {bid}（{'、'.join(scenes)}）")
             out.extend(lines)
             out.append("")
+    for bid in bad:
+        draft.pop(bid, None)
     out.append("## 草稿：skipWaves")
+    if bad:
+        out.append(f"（波次不完整、没出草稿 / incomplete, no draft：{', '.join(sorted(bad))}）")
     out.append("```json")
     out.append(json.dumps(draft, ensure_ascii=False, indent=2))
     out.append("```")
     print("\n".join(out))
+    if bad:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

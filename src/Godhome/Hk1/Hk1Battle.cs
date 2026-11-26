@@ -298,32 +298,80 @@ internal static class Hk1Battle
     /// </summary>
     internal static void PlayOut(string ev, Action then)
     {
+        // then 只调一次：协程里、出错兜底、外面的截止时间（ModeController.WonOutCap）哪条先到都只算一次。
+        bool called = false;
+        void Once()
+        {
+            if (called)
+            {
+                return;
+            }
+            called = true;
+            then();
+        }
         if (!Usable)
         {
-            then();
+            Once();
             return;
         }
         try
         {
             Drop(ref cover);
             GameObject go = Spawn(SceneManager.GetActiveScene(), "out");
-            Run().Begin(OutRoutine(go, ev, then));
+            Run().Begin(OutRoutine(go, ev, Once));
         }
         catch (Exception e)
         {
             GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：出去出错 / hk1 battle transitions: out failed: {e.GetBaseException().Message}");
-            then();
+            Once();
         }
+    }
+
+    /// <summary>
+    /// 正在放的“出去”的 END 监听。协程半路出错停了，摘不掉的订阅留在这里，下一次 PlayOut、AbandonOut 时摘
+    /// （Codex 审计 0.10.3 F06：以前第一次 yield 之后外部调用一抛异常，then 和解除订阅都不会执行）。
+    /// </summary>
+    private static EventRegister? outListen;
+    private static Action? outHandler;
+
+    private static void DropOutListen()
+    {
+        if (outListen != null && outHandler != null)
+        {
+            try
+            {
+                outListen.ReceivedEvent -= outHandler;
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：摘 {EvEnd} 监听出错 / removing the {EvEnd} listener failed: {e.Message}");
+            }
+        }
+        outListen = null;
+        outHandler = null;
+    }
+
+    /// <summary>外面等“出去”等到截止时间，自己走了（ModeController）：摘掉这次的监听。特效跟着旧场景卸载。</summary>
+    internal static void AbandonOut(string why)
+    {
+        if (outListen != null)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：不等“出去”了 / giving up on the hk1 out transition（{why}）");
+        }
+        DropOutListen();
     }
 
     private static IEnumerator OutRoutine(GameObject go, string ev, Action then)
     {
         bool ended = false;
-        EventRegister? listen = null;
+        DropOutListen();
         try
         {
-            listen = EventRegister.GetRegisterGuaranteed(Run().gameObject, EvEnd);
-            listen.ReceivedEvent += OnEnd;
+            EventRegister listen = EventRegister.GetRegisterGuaranteed(Run().gameObject, EvEnd);
+            Action h = OnEnd;
+            listen.ReceivedEvent += h;
+            outListen = listen;
+            outHandler = h;
         }
         catch (Exception e)
         {
@@ -334,10 +382,19 @@ internal static class Hk1Battle
         float limit = OutWait;
         if (go != null)
         {
-            Send(go, ev);
-            Dump(go);
-            limit = Duration(go, ev);
-            yield return DebugShot(go, ev == EvFinal ? "final" : ev == EvOutStatue ? "statue" : "out");
+            // yield 之后的外部调用（发事件、读 FSM 变量、调试截图）各自兜住：一个抛异常，后面照样解除订阅、调 then。
+            try
+            {
+                Send(go, ev);
+                Dump(go);
+                limit = Duration(go, ev);
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：放 {ev} 出错，不等了 / playing {ev} failed, not waiting: {e.GetBaseException().Message}");
+                limit = 0f;
+            }
+            yield return Guarded(DebugShot(go, ev == EvFinal ? "final" : ev == EvOutStatue ? "statue" : "out"), "debug shot");
             while (!ended && go != null && t < limit)
             {
                 GameManager gm = GameManager.UnsafeInstance;
@@ -348,15 +405,19 @@ internal static class Hk1Battle
                 yield return null;
             }
         }
-        if (listen != null)
-        {
-            listen.ReceivedEvent -= OnEnd;
-        }
+        DropOutListen();
         GodhomePlugin.Log.LogInfo($"[Godhome] 前作连战转场：{ev} {(ended ? $"放完 / ended（{t:0.0}/{limit:0.0} 秒）" : go == null ? "特效没了 / effect gone" : $"等了 {t:0.0} 秒没收到 END / no END after {t:0.0} s")}，切场景 / leaving");
         if (!ended)
         {
             // 没放完就走（特效会跟着旧场景卸载）：它关掉的暂停还回来（放完时它自己在 Send Event 里还）。
-            ReleasePause(go, ev);
+            try
+            {
+                ReleasePause(go, ev);
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：还暂停出错 / releasing the pause failed: {e.Message}");
+            }
         }
         // 暂停中不切（ModeController.Transition 会挂起，这里等一下更稳）。
         while (GameManager.UnsafeInstance != null && GameManager.UnsafeInstance.IsGamePaused())
@@ -373,9 +434,42 @@ internal static class Hk1Battle
         }
         // 切场景时特效跟着旧场景卸载；没切走（切场景失败）也不能一直盖着。
         yield return new WaitForSecondsRealtime(OutLifetime);
-        Retire(go, ev);
+        try
+        {
+            Retire(go, ev);
+        }
+        catch (Exception e)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：撤掉特效出错 / retiring the effect failed: {e.Message}");
+        }
 
         void OnEnd() => ended = true;
+    }
+
+    /// <summary>
+    /// 跑一个子协程，它抛异常就记警告、当它结束（不让异常打断外面的协程）。含 yield 的方法里不能用带 catch 的 try 包住 yield，
+    /// 所以把 MoveNext 单独包起来。子协程 yield 出来的嵌套协程不在保护范围内（这里只用于调试截图）。
+    /// </summary>
+    private static IEnumerator Guarded(IEnumerator inner, string what)
+    {
+        while (true)
+        {
+            object? current;
+            try
+            {
+                if (!inner.MoveNext())
+                {
+                    yield break;
+                }
+                current = inner.Current;
+            }
+            catch (Exception e)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作连战转场：{what} 出错，跳过 / {what} failed, skipped: {e.GetBaseException().Message}");
+                yield break;
+            }
+            yield return current;
+        }
     }
 
     /// <summary>特效自己的时长（Transitions FSM 的变量，前作 FSM 导出核实）加一点余量；读不到用 OutWait。</summary>

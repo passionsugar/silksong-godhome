@@ -113,6 +113,12 @@ internal sealed class FsmStep
     /// <summary>只用于 debug.react：在 when 状态里停了至少这么多秒才执行（0 = 一进去就执行）。</summary>
     public float After;
 
+    /// <summary>
+    /// 只用于 arena.enter：开战离不开这一步（"required": true）。没等到 when、执行失败，这一场按场地出错回大厅（不记尝试），
+    /// 不留在一场永远开不了的战斗里（Codex 审计 0.10.3）。没写的照旧：失败只记警告。
+    /// </summary>
+    public bool Required;
+
     public override string ToString() => Type switch
     {
         "register" => $"register '{Event}'",
@@ -219,6 +225,12 @@ internal sealed class ArenaPatch
     public string Name = "";
     public string ValueType = "";
     public JToken? Value;
+
+    /// <summary>
+    /// 开战离不开这条补丁（"required": true）：这一场的场景都准备好以后还没打上，按场地出错回大厅（不记尝试）。
+    /// 没写的照旧：打不上只记警告（有的补丁只是跳过前置演出，打不上退回原版流程也能打）。
+    /// </summary>
+    public bool Required;
 
     public override string ToString() => Type switch
     {
@@ -415,7 +427,17 @@ internal static class BossCatalog
                 Delay = Clamp(Num(s["delay"]), 0f, 60f, 0f),
                 When = Str(s, "when") ?? "",
                 After = Clamp(Num(s["after"]), 0f, 60f, 0f),
+                Required = Bool(s, "required"),
             };
+            if (s["required"] is JToken rq && rq.Type != JTokenType.Boolean)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] {id}: {section} 的 required 要写 true / false，当作 false / \"required\" must be a bool; treated as false: {rq.ToString(Newtonsoft.Json.Formatting.None)}");
+            }
+            if (step.Required && section != "arena.enter")
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] {id}: required 只用于 arena.enter，{section} 里不认 / \"required\" only applies to arena.enter; ignored in {section}");
+                step.Required = false;
+            }
             if ((section == "debug.react" || section == "debug.holdKill") && step.When.Length == 0)
             {
                 GodhomePlugin.Log.LogWarning($"[Godhome] {id}: {section} 有一步没写 when，跳过 / a step has no \"when\", skipped");
@@ -527,7 +549,12 @@ internal static class BossCatalog
                 Event = Str(s, "event") ?? "",
                 To = Str(s, "to") ?? "",
                 Name = Str(s, "name") ?? "",
+                Required = Bool(s, "required"),
             };
+            if (s["required"] is JToken rq && rq.Type != JTokenType.Boolean)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] {id}: arena.patch 的 required 要写 true / false，当作 false / \"required\" must be a bool; treated as false: {rq.ToString(Newtonsoft.Json.Formatting.None)}");
+            }
             // var 只能写一个值，类型要和键对上（Codex 审查 0.9.0 #12）：写两个时不让后一个悄悄盖掉前一个，类型不对不留到 FSM 醒来才抛异常。
             string[] valueKeys = new[] { "bool", "int", "float", "string" }.Where(vt => s[vt] != null).ToArray();
             string? valueBad = null;

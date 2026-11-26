@@ -87,16 +87,37 @@ def scan(path):
             "benches": sorted(benches), "gates": gates, "enemies": enemies}
 
 
+def load_done(out):
+    """已经扫成功的包（续跑时跳过）。上次出错的记录丢掉、下次重扫（Codex 审计 0.10.3 PT01：以前出错的也算扫过，临时读不了的包永远漏掉）。
+    输出文件改写成只剩成功的记录（同一个包只留最后一条），先写临时文件再替换。"""
+    if not os.path.exists(out):
+        return set()
+    keep = {}
+    dropped = 0
+    for line in open(out, encoding="utf-8"):
+        try:
+            rec = json.loads(line)
+        except Exception:
+            dropped += 1
+            continue
+        if not isinstance(rec, dict) or "bundle" not in rec or "error" in rec:
+            dropped += 1
+            continue
+        keep[rec["bundle"]] = line.rstrip("\n")
+    if dropped:
+        tmp = out + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            for line in keep.values():
+                f.write(line + "\n")
+        os.replace(tmp, out)
+        print(f"[Godhome] 去掉 {dropped} 条出错或读不了的记录，这些包会重扫 / dropped {dropped} failed records, they will be rescanned", flush=True)
+    return set(keep)
+
+
 def main():
     sdir, out = sys.argv[1:3]
     files = sys.argv[3:] or sorted(f for f in os.listdir(sdir) if f.endswith(".bundle"))
-    done = set()
-    if os.path.exists(out):
-        for line in open(out, encoding="utf-8"):
-            try:
-                done.add(json.loads(line)["bundle"])
-            except Exception:
-                pass
+    done = load_done(out)
     t0 = time.time()
     with open(out, "a", encoding="utf-8") as f:
         for i, fn in enumerate(files):

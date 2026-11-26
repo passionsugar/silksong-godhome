@@ -21,9 +21,12 @@ internal sealed class LoomUI : MonoBehaviour
     private GUIStyle? rowSelStyle;
     private GUIStyle? titleStyle;
     private GUIStyle? cancelStyle;
+    private GUIStyle? noticeStyle;
     private Texture2D? panelTex;
     private Texture2D? selTex;
     private Texture2D? coverTex;
+    private Texture2D? noticeErrTex;
+    private Texture2D? noticeInfoTex;
 
     // 全屏黑幕（圣所搭建、丝门传送时遮住画面）。超过 CoverWatchdog 秒没人动它就自己掀开，免得卡黑屏；
     // 拉下黑幕的人可以给一个 hold：它返回 true（比如搭建任务还有效）就不揭，但最多挡 CoverCap 秒（Codex 审查 v0.6.0 #7）。
@@ -37,6 +40,45 @@ internal sealed class LoomUI : MonoBehaviour
     private Func<bool>? coverHold;
 
     private void Awake() => Instance = this;
+
+    // ───────────────────────────── 提示 ─────────────────────────────
+    // 只给出错、存档被拦、要等一下这类（ModeController.ShowNotice）：屏幕底部一行，过 seconds 秒自己消失。
+    // 进场、胜利这些装饰性的提示不上屏（0.7.0 起界面上不画那些文字）。
+
+    private string? notice;
+    private float noticeUntil;
+    private bool noticeError;
+
+    internal void ShowNotice(string text, float seconds, bool error)
+    {
+        notice = text;
+        noticeUntil = Time.unscaledTime + Mathf.Clamp(seconds, 1f, 30f);
+        noticeError = error;
+    }
+
+    private bool NoticeOn => notice != null && Time.unscaledTime < noticeUntil;
+
+    private void DrawNotice(float w)
+    {
+        if (notice == null || noticeStyle == null || panelTex == null)
+        {
+            return;
+        }
+        float bw = Mathf.Min(1500f, w - 80f);
+        var content = new GUIContent(notice);
+        float bh = Mathf.Max(70f, noticeStyle.CalcHeight(content, bw - 60f) + 28f);
+        var box = new Rect((w - bw) / 2f, RefHeight - bh - 60f, bw, bh);
+        // 剩最后 0.5 秒时淡出。
+        float a = Mathf.Clamp01((noticeUntil - Time.unscaledTime) / 0.5f);
+        Color oc = GUI.color;
+        GUI.color = new Color(1f, 1f, 1f, a);
+        GUI.DrawTexture(box, panelTex);
+        // 出错的左边一道暖色边，“请稍等”的是灰色：一眼分得出来（审计 F05：不要让还原失败和正在存档看起来一样）。
+        GUI.DrawTexture(new Rect(box.x, box.y, 6f, box.height), noticeError ? noticeErrTex! : noticeInfoTex!);
+        noticeStyle.normal.textColor = noticeError ? new Color(0.98f, 0.86f, 0.62f) : new Color(0.85f, 0.85f, 0.85f);
+        GUI.Label(new Rect(box.x + 30f, box.y + 14f, bw - 60f, bh - 28f), content, noticeStyle);
+        GUI.color = oc;
+    }
 
     // ───────────────────────────── 黑幕 ─────────────────────────────
 
@@ -744,6 +786,9 @@ internal sealed class LoomUI : MonoBehaviour
         rowSelStyle.normal.background = selTex;
         rowSelStyle.normal.textColor = Color.white;
         cancelStyle = new GUIStyle(rowStyle) { alignment = TextAnchor.MiddleCenter };
+        noticeStyle = new GUIStyle(textStyle) { fontSize = 26, wordWrap = true, alignment = TextAnchor.MiddleLeft };
+        noticeErrTex = Solid(new Color(0.94f, 0.66f, 0.3f, 1f));
+        noticeInfoTex = Solid(new Color(0.6f, 0.6f, 0.62f, 1f));
     }
 
     private static Texture2D Solid(Color c)
@@ -756,16 +801,18 @@ internal sealed class LoomUI : MonoBehaviour
 
     private void OnGUI()
     {
-        // 界面上不画任何文字（名牌、提示条、计时、调试行都去掉了）：只有黑幕和挑战面板。
+        // 界面上不画装饰性的文字（名牌、提示条、计时、调试行都去掉了）：只有黑幕、挑战面板和出错提示。
         float cover = CoverNow();
-        // 暂停时不画黑幕：OnGUI 画在所有 uGUI 画布上面，会把暂停菜单整个盖住（审查）。黑幕本身的计时照旧。
-        if (GameManager.UnsafeInstance is GameManager gm && gm.IsGamePaused())
+        // 暂停时不画黑幕和提示：OnGUI 画在所有 uGUI 画布上面，会把暂停菜单整个盖住（审查）。黑幕、提示本身的计时照旧。
+        bool paused = GameManager.UnsafeInstance is GameManager gm && gm.IsGamePaused();
+        if (paused)
         {
             cover = 0f;
         }
         bool fallbackPanel = (Challenge != null || DoorChallenge != null) && !nativeOpen;
         bool fallbackResult = resultOpen && !resultNative && result != null;
-        if (!fallbackPanel && !fallbackResult && cover <= 0.001f)
+        bool showNotice = NoticeOn && !paused;
+        if (!fallbackPanel && !fallbackResult && cover <= 0.001f && !showNotice)
         {
             return;
         }
@@ -794,6 +841,15 @@ internal sealed class LoomUI : MonoBehaviour
             {
                 DrawResult(Screen.width / scale, result!);
             }
+            GUI.matrix = old;
+        }
+        if (showNotice)
+        {
+            // 画在黑幕上面（转场黑屏时也看得到）。
+            float scale = Screen.height / RefHeight;
+            Matrix4x4 old = GUI.matrix;
+            GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+            DrawNotice(Screen.width / scale);
             GUI.matrix = old;
         }
     }

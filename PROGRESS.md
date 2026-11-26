@@ -1241,6 +1241,61 @@
 - 调试关闭启动正常：表校验 50 条、0 个无效字段，插件 `debug = False`。
 - 存档：每次启动前都备份（最新 `backups/2026-11-26_165158`）；槽 1、2、4 和基线一致，槽 3、配置已复原。
 - 正式版 0.10.3 装在 `plugins\Godhome`；调试版挪在 `godhome-saves-aside\local-Godhome-r9-debug-2026-11-26_154942`。
+- **发布 0.10.3**（你说“修复一下 然后推送到github上”）：
+  - 公开仓库用 `scripts/export-public.ps1` 从 4ac4951 导出（扫描干净，131 个文件）。导出单独 Release 编译通过（0 个错误），提交 2d6b293 推到 `main`。
+  - Release [v0.10.3](https://github.com/passionsugar/silksong-godhome/releases/tag/v0.10.3)，标成 Latest，附 `Godhome-LoomOfRecollection-0.10.3.zip`（3d58656 打的包）。
+    SHA-256 `B201908E6368FFBFD863BB5251020E0D126718ABE7AF8361F0502EBF01E660E1`，从 GitHub 下载回来核对一致。
+  - 第一次打的 87f7979 包没发，留在 `godhome-saves-aside\Godhome-LoomOfRecollection-0.10.3-87f79795.zip`。
+
+### 第十轮：Codex 审计 0.10.3 的修复、一键安装、0.10.4（2026-11-26）
+
+你转来 Codex 对 0.10.3 的审计报告，说“修改这些，然后推送到 GitHub，并提供一个一键安装 mod 脚本方便用户安装”。
+
+**插件（玩家能碰到的）**（c5fa8502）：
+- F01：`thunderstore.toml` 补上 DataManager 1.2.2、I18N 1.1.1 依赖。F02：`install-deps.ps1` 显式下载 I18N（csproj 的 `PackageDownload`），先查齐所有来源再复制，NuGet 缓存位置按 `dotnet nuget locals` 查。
+- F03：万神殿换场时快照拷回会把休息点长椅上换的纹章、工具也撤掉（只管紧接着的一场）。新加 `Mode/RunGear.cs`：拷回前记下身上的配装，拷回后放回去，不一样就 `SendEquippedChangedEvent(force)` 刷新招式。回大厅照旧回到开殿前的配装。
+- F04：蓝血（`healthBlue`）一直带到下一场；长椅照游戏的规矩清。
+  补回蓝血不能发 `UPDATE BLUE HEALTH`：实测它让 HUD 的 Blue Health Control 走 REMOVE BLUE HEALTH 并把 `healthBlue` 清零（第一版这么写，自检蓝血 0/8）。
+  现在 `ModeController.SetBlueHealth`：要少就先清，再用 `GameManager.AddBlueHealthQueued` 一格格加回，HUD 和数值一起变（79d8661a）。
+- F05：要重新读档、开战 / 回大厅失败、存档被拦、场地出错时屏幕底部出提示框（`LoomUI.ShowNotice`，暖色竖条是错误、灰色是提示，淡出）；装饰性的横幅照 0.7.0 的决定只写日志。
+- F06：前作 Boss 打赢后的退场协程只回调一次、出错也放下暂停；20 秒还没回调就自己离开战场（记 `LastWonFallback`）。
+- F07–F09：配置说明更新；计时先舍入到十分之一秒再拆分秒；前作雕像按所有贴图合起来的范围放，最大的图不在第一张时日志对比新旧范围。
+- 风险表里改了的：`PatchAll` 失败撤掉已打的补丁；`GG_End_Sequence` 重定向只在模式里；场景图索引扫完才发布；万神殿缺 Boss 整座不开；`bosses.json` 的 `patch` / `enter` 可标 `required`（见 `docs/arena.md`），针姬的三步标上。
+- 调试：宣传录像不再堵主线程（丢帧计数、连丢停录，收尾放后台线程，超时结束 ffmpeg）；关调试、换槽停录像不退游戏；巡视等 5 秒后再确认才退；截图恢复相机的自动宽高比；探针配置改了提示要重启。
+- 自检报告写进场挨打（Codex 6.4）：分“恢复操作前”（玩家躲不开，要改落点）和之后（正常交战），报告头一行写场次数，末尾列出来。
+- 构建告警清零：Harmonize 不认 `[HarmonyFinalizer]`，`SavePatches.cs` 整个文件关 HARMONIZE004（写了原因）；两处 `Harmony003` 和两处可空告警修掉。0 警告 0 错误。
+
+**脚本和离线工具**（c5fa8502）：
+- `watch-selftest`：按开始时的字节偏移读日志（日志重写了从头读），`-Shot` 先查截图脚本在不在。
+- `fetch-parallel`：分段目录记下载源（URL、长度、ETag、hash），对不上清掉重下；每段核对 206 和 Content-Range；合并到临时文件再替换；参数范围检查。本地测试服务器验证：正常下载 hash 对、服务器不认 Range 时报错不留文件、别的来源留下的分段清掉重下。
+- Python（PT01–PT06）：扫描出错的包下次重扫；世界坐标逐级乘完整矩阵；特殊死亡认 True/1；导出字符串统一单引号转义（新 `tools/dumpfmt.py` 共用），读不懂的 FSM 标题报错，动作类型名去掉自定义显示名；物体引用数组不截断，`wave_scan` 遇到截断不出草稿；`lang_table` 取 EN/ZH 并集；`bootstrap_bosses` 不覆盖已有文件。合成输入测 28 项全过。
+
+**一键安装**（c64a38bf）：`packaging/install.ps1` + `install.bat` / `uninstall.bat`，`package.ps1` 打进 zip 根目录（ps1 写成 UTF-8 带 BOM、CRLF，bat 纯 ASCII）。
+- 找游戏：`-GameDir` → 压缩包解压在游戏文件夹里 → Steam 注册表和 `libraryfolders.vdf` → 让玩家粘贴路径。游戏开着不装。
+- 没有 BepInEx 5 装 `BepInExPack_Silksong` 1.0.3（只加文件，已有的不覆盖）；缺 DataManager、I18N 下载装进 `BepInEx\plugins\作者-名字`；找到前作再装 UnitySceneRepacker 0.3.0。
+- 下载的包核对 `manifest.json` 的名字和版本、拒绝越出目录的路径；已经装了的（旁边 manifest 或文件版本够新）不重复下载；别处有旧版本停下说明。
+- 最后整个换掉 `BepInEx\plugins\Godhome` 并核对 hash。别处另有一份 `Godhome.dll` 时提醒，玩家亲口说 y 才删（`-Yes` 时不删）。`-Uninstall` 只删模组。
+- `package.ps1` 核对 `data`、`languages` 两边的文件列表和 hash（以前漏 `hk1.json`）；`export-public` 也扫 `.bat`。
+- 测试：本机合成测试 29 项全过（假游戏文件夹、假 Thunderstore 包、不联网）。开发机实装：自动找到的是 G: 上另一份游戏（你自己的、装着别的模组、没有前置），`-NoDownload` 下在改动前停下，G: 没动；指定 R: 的测试游戏后认出已装的 BepInEx 5.4.23、DataManager、I18N、UnitySceneRepacker，装上 0.10.4，hash 一致。
+- 没测：真的从 Thunderstore 下载（下载要先问你）。四个下载地址用 HEAD 请求确认都 302 到 zip（679 KB、64 KB、24 KB、4.3 MB）。
+
+**实测**（槽 3，每次启动前备份存档）：
+- 万神殿自检新加了两项：休息点用 `SwapCrestForTest` 换一个已解锁的纹章，检查之后各场都还是它、回大厅变回开殿前的（F03）；每场打完把蓝血设成 2，检查下一场带过来的（F04）。
+- p1 第一次（21:10）：10/10 场，26/27。纹章 Hunter_v3→Reaper 带到 9/9、回大厅变回 Hunter_v3。蓝血 0/8：自检自己发 `UPDATE BLUE HEALTH` 把蓝血清了，顺带查出 `ReapplyCarry` 同样的毛病（见上面 F04）。
+- p1 修完（21:20）：**10/10 场、27/27 项全过**。蓝血 2 带到 8/8，纹章 9/9，血 8/8，结算、回门前、不记录都对。
+  进场检查 3 场碰到伤害（钟道兽、巨型螺蝇、蕾丝），都在恢复操作以后（Boss 自己开打），恢复操作前 0 场。
+  退出游戏时多出几条 `Couldn't find a Game Manager`，在 Steam API 关掉以后，是退出顺序，不是模组。
+- 针姬单场（21:26）：1/1。必需的 `TEST`、`Accept` 两步都做到，开战、判胜正常。没故意弄坏一步去走“场地出错”那条路。
+- 前作巡视（21:28）：全部通过（雕像面板、开战、赢了回雕像前、拉杆换版本、屋顶第五扇门、雕像和万神殿里各死一次）。
+  F09 的证据：三尊雕像最大的图不是第一张，两尊范围变了。螳螂领主那尊以前漏了左边的螳螂，现在按三只合起来放，截图和前作原图占的位置一致；
+  右边那尊（两张同样的图一高一低）以前只算上面那张，现在两张合起来，石像更大、更低。佐特那尊范围没变。新旧截图对比过，新的更接近前作。
+- 发布用的包（7c4070e6，SHA-256 `83B23711…1424`）用包里的 `install.ps1 -GameDir … -Yes -NoDownload` 装进测试游戏：四个前置都认出已装，模组装上，hash 和包里一致。下面的 p5 用的就是这份。
+- p5 回归（21:43–22:03）：**47/47 场、43/43 项全过**，用时 17:34.6。纹章带到 35/35、蓝血 43/43、血 43/43，回大厅变回 Hunter_v3。
+  进场检查 12 场碰到伤害，全在恢复操作以后，恢复操作前 0 场。
+  21:34 第一次启动时测试机的 Steam 连不上服务器（`LogonFailure No Connection`，联网检查打到 198.18.x 失败），停在“云同步失败”对话框；21:42 联网恢复、21:43 有人点了才启动。
+- 关调试启动没测成：22:04 启动停在 Steam“手柄配置同步失败”对话框（AppID 241100），30 分钟没人点。
+  这一轮玩法代码的改动都不看调试开关，关调试时启动只少打调试补丁（和 0.10.3 一样，0.10.3 关调试启动测过），所以没等。
+- 收尾：槽 3 从基准还原（跑过的挪到 `godhome-saves-aside\slot3-cloudrun-2026-11-26_223700`），槽 1/2/4 共 34 个文件没变，配置还原（调试关），锁放掉。
 
 ### 还没做
 
@@ -1249,6 +1304,11 @@
   进场检查只在调试里，以后新加 Boss 先跑一遍自检看汇总（“进场检查汇总”）。
 - 自检不会真的用手打：沙克拉、加蒙德中途变回对话，原初罪者的血条，二见兽蝇的仇恨，都是照原版 FSM 改的、自检看过状态，没有人手打过一整场。
 - 寡妇（widow）的挑战区要玩家做特殊挑战动作（`SPECIAL CHALLENGE`）才开打。
+- Codex 审计 0.10.3 里这一轮没改的（风险表里的“待测 / 加固”项，都不是已经出过的故障）：
+  前作资源同步 Locate 会卡一下主线程；别的模组调 `GetSaveGameData` 的路径；存档队列的反射找不到时怎么收；同一帧里换存档槽；
+  UnitySceneRepacker 的初始化顺序；非 Steam 版的路径探测；手办屋雕像生成的帧预算；音频；更宽的“一直没开战”看门狗。
+- 万神殿里工具的剩余次数不带到下一场（每场回到开殿时的数量），是现在的规则，`RunGear` 注释里写着。
+- 一键安装没有真的从 Thunderstore 下载测过（只测了地址和本地假包）。
 
 ## 万神殿（2026-11-23，插件 0.8.0）
 

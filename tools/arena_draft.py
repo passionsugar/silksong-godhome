@@ -21,6 +21,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dumpfmt import action_name, parse_fsm_head  # noqa: E402
+
 sys.stdout.reconfigure(encoding="utf-8")
 
 WORLD = {"Black Thread States", "Black Thread States Thread Only Variant", "Area_States"}
@@ -33,7 +36,6 @@ NOISE = re.compile(r"audio|music|fog|atmos|sound|camera|cam lock|title|dialogue|
 WAIT_STATE = re.compile(r"dormant|idle|sleep|ready|init|wait|out of range|unencountered|rest|detect", re.I)
 
 OBJ_RE = re.compile(r"^  (\S.*?)  @\(([-\d.]+),([-\d.]+)\)(.*?)\{(.*)\}\s*$")
-FSM_RE = re.compile(r"^=== FSM (.*?) :: '(.*?)'\s+start='(.*?)'(.*)$")
 # 新版导出（dump_fsm.py 的 world_bounds）：size 和 off 之间插了 points=、world x a..b y c..d、顶点表。
 WORLD_RE = re.compile(r"world x ([-\d.]+)\.\.([-\d.]+) y ([-\d.]+)\.\.([-\d.]+)")
 BOX_RE = re.compile(r"BoxCollider2D size=\(([-\d.]+),([-\d.]+)\).*? off=\(([-\d.]+),([-\d.]+)\)")
@@ -50,7 +52,7 @@ def parse(path):
     with open(path, encoding="utf-8") as f:
         lines = f.read().splitlines()
     section = cur_obj = cur_fsm = cur_state = None
-    for ln in lines:
+    for no, ln in enumerate(lines, 1):
         if ln.startswith("## "):
             section = "fsm" if ln.startswith("## FSM") else "obj"
             continue
@@ -63,9 +65,11 @@ def parse(path):
             elif cur_obj is not None and ln.startswith("      "):
                 cur_obj["details"].append(ln.strip())
         elif section == "fsm":
-            m = FSM_RE.match(ln)
-            if m:
-                cur_fsm = {"path": m.group(1), "name": m.group(2), "start": m.group(3), "flags": m.group(4),
+            # 标题行读不懂直接报错（dumpfmt），不当成没有这个 FSM、也不把它的状态记到上一个 FSM 里。
+            head = parse_fsm_head(ln, f"{path}:{no}")
+            if head:
+                fpath, fname, fstart, fflags = head
+                cur_fsm = {"path": fpath, "name": fname, "start": fstart, "flags": fflags,
                            "states": {}, "globals": []}
                 fsms.append(cur_fsm)
                 cur_state = None
@@ -94,29 +98,34 @@ def in_scope(path, roots):
     return any(path == r or path.startswith(r + "/") for r in roots)
 
 
+SPECIAL_RE = re.compile(r"\bhasSpecialDeath=(True|1)\b")
+
+
 def hm_info(o):
+    """血量组件：hp 和有没有特殊死亡。dump_fsm 的布尔写成 True（False 不写），旧导出可能是 1，两种都认（Codex 审计 0.10.3 PT03）。"""
     for d in o["details"]:
         if d.startswith("HealthManager:"):
             hp = re.search(r"\bhp=(\d+)", d)
-            return {"hp": int(hp.group(1)) if hp else None, "special": "hasSpecialDeath=1" in d}
+            return {"hp": int(hp.group(1)) if hp else None, "special": bool(SPECIAL_RE.search(d))}
     return None
 
 
 def trigger_box(o):
-    """物体上第一个触发碰撞体的世界坐标中心和大小。
-    新版导出有世界范围（已按位置、旋转、缩放换算），直接用；旧格式只认 BoxCollider2D，按物体位置加 offset（不管缩放、旋转）。"""
+    """物体上第一个触发碰撞体的世界坐标中心、大小，和是不是精确的。
+    新版导出有世界范围（按完整的位置、旋转、缩放矩阵换算了所有角点），直接用；
+    旧格式只认 BoxCollider2D，按物体位置加 offset（不管缩放、旋转），不精确，草稿里会提醒重新导出。"""
     for d in o["details"]:
         if not d.startswith("trigger:"):
             continue
         m = WORLD_RE.search(d)
         if m:
             x0, x1, y0, y1 = map(float, m.groups())
-            return ((x0 + x1) / 2, (y0 + y1) / 2), (x1 - x0, y1 - y0)
+            return ((x0 + x1) / 2, (y0 + y1) / 2), (x1 - x0, y1 - y0), True
         m = BOX_RE.search(d)
         if m:
             w, h, ox, oy = map(float, m.groups())
-            return (o["pos"][0] + ox, o["pos"][1] + oy), (w, h)
-    return None, None
+            return (o["pos"][0] + ox, o["pos"][1] + oy), (w, h), False
+    return None, None, False
 
 
 def r1(v):
@@ -191,7 +200,7 @@ def main():
                 for a in st["acts"]:
                     if a.startswith("(off)"):
                         continue
-                    an = a.split("(", 1)[0]
+                    an = action_name(a)
                     if an not in TRIGGER_ACTIONS or "Exit" in a.split("trigger=", 1)[-1][:20]:
                         continue
                     range_path = f["path"]
@@ -207,14 +216,14 @@ def main():
                         want = (mn.group(1) if mn else "") or "Alert Range"
                         range_path = next((p for p in objs if p.startswith(f["path"] + "/") and p.split("/")[-1] == want), "")
                     o = objs.get(range_path)
-                    c, size = trigger_box(o) if o else (None, None)
+                    c, size, exact = trigger_box(o) if o else (None, None, False)
                     on_boss = any(f["path"] == p for p in boss_paths)
                     above_boss = any(p.startswith(f["path"] + "/") for p in boss_paths)
                     noise = bool(NOISE.search(f["path"].split("/")[-1] + " " + f["name"]))
                     score = (3 if on_boss else 2 if above_boss else 0) + (1 if WAIT_STATE.search(sn) else 0) \
                         + (1 if f["name"] in ("Control", "Battle Start", "Challenge") else 0) + (1 if c else 0) - (6 if noise else 0)
                     wakes.append({"path": f["path"], "fsm": f["name"], "state": sn, "action": an, "range": range_path,
-                                  "center": c, "size": size, "noise": noise, "score": score})
+                                  "center": c, "size": size, "exact": exact, "noise": noise, "score": score})
         wakes.sort(key=lambda w: -w["score"])
         battles = [p for p in objs if in_scope(p, roots) and "BattleScene" in objs[p]["comps"]]
         gates = {p: objs[p]["pos"] for p in objs if any(d.startswith("TransitionPoint:") for d in objs[p]["details"])}
@@ -226,6 +235,8 @@ def main():
             a["door"] = [r1(pick["center"][0]), r1(pick["center"][1])]
             door_from = f"触发区 {pick['path']}::{pick['fsm']} [{pick['state']}] 的中心"
             review.append("door 取的是触发区中心，没实测过")
+            if not pick["exact"]:
+                review.append("触发区是旧格式导出（没算缩放、旋转），door 可能偏：用新版 dump_fsm.py 重新导出")
         else:
             door_from = "（没有）"
             review.append("没有 door 的候选")

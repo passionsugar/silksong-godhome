@@ -385,7 +385,7 @@ internal sealed class ModeController : MonoBehaviour
                 // 只换了一个：另一个可能还是战斗里改过的实时数据，回标题之前一律不存（Codex 审查 0.8.0）。
                 GodhomePlugin.Log.LogError("[Godhome] 内存里的存档数据只换了一半，拦下所有存档直到回标题画面 / only one of playerData/sceneData was replaced; blocking saves until the title screen");
                 SaveGuard.BlockAll = true;
-                ShowBanner(L.Get("ERR_NEED_RELOAD"), 10f);
+                ShowNotice(L.Get("ERR_NEED_RELOAD"), 10f);
             }
             ForceReset("save data replaced / 内存里换成了别的存档数据");
             return;
@@ -401,7 +401,7 @@ internal sealed class ModeController : MonoBehaviour
             GodhomePlugin.Log.LogError("[Godhome] 战斗中快照丢失，拦下所有存档直到回标题画面 / the fight snapshot is gone; blocking saves until the title screen");
             SaveGuard.BlockAll = true;
             ForceReset("fight snapshot lost / 战斗快照丢失");
-            ShowBanner(L.Get("ERR_NEED_RELOAD"), 10f);
+            ShowNotice(L.Get("ERR_NEED_RELOAD"), 10f);
             return;
         }
 
@@ -426,6 +426,7 @@ internal sealed class ModeController : MonoBehaviour
             if (State == LoomState.Won)
             {
                 fightEnd += dt;
+                wonLeavingAt += dt;
             }
             return;
         }
@@ -468,6 +469,7 @@ internal sealed class ModeController : MonoBehaviour
         if (FightLoading && Arena.Watch() is string arenaError)
         {
             GodhomePlugin.Log.LogError($"[Godhome] 场地出错，回大厅 / arena error, back to the lobby: {arenaError}");
+            ShowNotice(L.Get("ERR_ARENA"), 8f);
             ReturnToLobby("arena error / 场地出错", arenaFault: true);
             return;
         }
@@ -476,6 +478,17 @@ internal sealed class ModeController : MonoBehaviour
         switch (State)
         {
             case LoomState.Won:
+                // 前作的“出去”放了太久还没回调（协程半路出错停了：Codex 审计 0.10.3 F06）：不再等，自己走。
+                // 下面的兜底计时进 FinishWon 时看到 wonLeaving 会直接返回，所以这里单独数，不靠那个协程活着。
+                if (wonLeaving && Time.unscaledTime - wonLeavingAt > WonOutCap)
+                {
+                    GodhomePlugin.Log.LogWarning($"[Godhome] 前作的“出去” {WonOutCap:0} 秒没回调，自己走 / the hk1 out transition did not call back in {WonOutCap:0} s; leaving anyway");
+                    wonLeaving = false;
+                    Hk1Battle.AbandonOut("won-out cap / 截止时间到");
+                    LastWonFallback = true;
+                    LeaveWon();
+                    break;
+                }
                 // 正常由场地控制器的 OnBossSceneComplete 回程（OnArenaComplete）；它一直没来（人在危险复活、转场）就兜底。
                 if (Time.unscaledTime - fightEnd > WonTimeout)
                 {
@@ -506,6 +519,7 @@ internal sealed class ModeController : MonoBehaviour
             string ev = Run == null ? Hk1Battle.EvOutStatue : Run.IsLast ? Hk1Battle.EvFinal : Hk1Battle.EvOut;
             int serial = fightSerial;
             wonLeaving = true;
+            wonLeavingAt = Time.unscaledTime;
             Hk1Battle.PlayOut(ev, () =>
             {
                 if (wonLeaving && State == LoomState.Won && serial == fightSerial)
@@ -521,6 +535,15 @@ internal sealed class ModeController : MonoBehaviour
 
     /// <summary>正在放前作的“出去”，放完再离开战场（FinishWon）。换状态时清掉。</summary>
     private bool wonLeaving;
+
+    /// <summary>开始等“出去”的时刻（暂停的时间往后推）。</summary>
+    private float wonLeavingAt;
+
+    /// <summary>
+    /// 等前作“出去”回调最多多少秒（不算暂停）。协程自己最多等特效时长（8 秒以内）再加暂停，正常远远用不完；
+    /// 到了就当协程已经停了，自己离开战场（Codex 审计 0.10.3 F06）。
+    /// </summary>
+    private const float WonOutCap = 20f;
 
     private void LeaveWon()
     {
@@ -795,11 +818,18 @@ internal sealed class ModeController : MonoBehaviour
         }
         try
         {
+            // 连战里在休息点换过配装（RunGear）：拷回快照后配装回到开殿前，工具缓存、纹章招式要跟着刷新。
+            // 上面解开束缚时发的刷新在拷回之前，按的还是换过的配装（Codex 审计 0.10.3 风险“装备字段恢复后缓存是否刷新”）。
+            RunGear gear = RunGear.Take(PlayerData.instance);
             // 先拷回、快照留着（Codex 审查 v0.6.0 #5）：到大厅之前人还在战场，转场途中的存档照样只写快照，
             // 到了以后 FinishRestore 再拷一次、丢掉快照。
             lobbyRespawn = SaveGuard.RestoreKeep(GameManager.instance, why);
             SaveGuard.SuppressLevelState = true;
             restoreFailed = false;
+            if (gear.Differs(PlayerData.instance))
+            {
+                RunGear.Refresh("back to the lobby / 回大厅，配装回到开殿前");
+            }
         }
         catch (Exception e)
         {
@@ -928,7 +958,7 @@ internal sealed class ModeController : MonoBehaviour
         }
         if (restoreFailed)
         {
-            ShowBanner(L.Get("ERR_RETURN"), 10f);
+            ShowNotice(L.Get("ERR_RETURN"), 12f);
         }
         else
         {
@@ -1045,21 +1075,21 @@ internal sealed class ModeController : MonoBehaviour
         if (!b.ArenaReady)
         {
             GodhomePlugin.Log.LogError($"[Godhome] {b.Id} 不能开战 / cannot fight: {(b.Arena.Broken.Length > 0 ? b.Arena.Broken : "没有场地数据（arena.door）/ no arena data")}");
-            ShowBanner(L.Get("ERR_FIGHT"), 5f);
+            ShowNotice(L.Get("ERR_FIGHT"), 5f);
             return;
         }
         // 难度和雕像等快照拍成功以后再记（Codex 审查 v0.5.0 #7：被拒绝的开战不能留下它们）。
         if (SaveGuard.BlockAll || restoreFailed || SaveGuard.Active)
         {
             // 上一场没能还原（快照还在）或者出过异常：不能再拍新快照，只能回标题重新读档。
-            ShowBanner(L.Get("ERR_NEED_RELOAD"), 6f);
+            ShowNotice(L.Get("ERR_NEED_RELOAD"), 6f);
             return;
         }
         // 游戏的存档在后台线程序列化，捕获的对象引用的是存档开始时的数据；还有没写完的存档时先不改数据（Codex 复审）。
         if (SaveGuard.SaveQueueBusy())
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 正在存档，稍后再开战 / a save is still being written, not starting {b.Id} yet");
-            ShowBanner(L.Get("WAIT_SAVING"), 3f);
+            ShowNotice(L.Get("WAIT_SAVING"), 3f, error: false);
             return;
         }
         // 挑战面板开着（自检、调试键直接开战）：先关掉并交还暂停和交互，快照里不能带着面板的 disablePause（Codex 审查 v0.5.0 #2）。
@@ -1073,7 +1103,7 @@ internal sealed class ModeController : MonoBehaviour
         {
             GodhomePlugin.Log.LogError($"[Godhome] 开战前拍快照失败，取消 / snapshot before the fight failed, cancelled: {e}");
             SaveGuard.Clear();
-            ShowBanner(L.Get("ERR_FIGHT"), 5f);
+            ShowNotice(L.Get("ERR_FIGHT"), 5f);
             return;
         }
         CurrentTier = Mathf.Clamp(tier, 0, 2);
@@ -1162,18 +1192,18 @@ internal sealed class ModeController : MonoBehaviour
         if (noArena.Count > 0)
         {
             GodhomePlugin.Log.LogError($"[Godhome] 万神殿 {p.Id} 里有 Boss 没有场地数据，不能开始 / pantheon has bosses without arena data: {string.Join(", ", noArena)}");
-            ShowBanner(L.Get("ERR_FIGHT"), 5f);
+            ShowNotice(L.Get("ERR_FIGHT"), 5f);
             return;
         }
         if (SaveGuard.BlockAll || restoreFailed || SaveGuard.Active)
         {
-            ShowBanner(L.Get("ERR_NEED_RELOAD"), 6f);
+            ShowNotice(L.Get("ERR_NEED_RELOAD"), 6f);
             return;
         }
         if (SaveGuard.SaveQueueBusy())
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 正在存档，稍后再开始 / a save is still being written, not starting pantheon {p.Id} yet");
-            ShowBanner(L.Get("WAIT_SAVING"), 3f);
+            ShowNotice(L.Get("WAIT_SAVING"), 3f, error: false);
             return;
         }
         LoomUI.Instance?.AbortChallenge("pantheon starting");
@@ -1185,7 +1215,7 @@ internal sealed class ModeController : MonoBehaviour
         {
             GodhomePlugin.Log.LogError($"[Godhome] 万神殿开始前拍快照失败，取消 / snapshot before the pantheon failed, cancelled: {e}");
             SaveGuard.Clear();
-            ShowBanner(L.Get("ERR_FIGHT"), 5f);
+            ShowNotice(L.Get("ERR_FIGHT"), 5f);
             return;
         }
         CurrentTier = 0;
@@ -1240,6 +1270,9 @@ internal sealed class ModeController : MonoBehaviour
         PlayerData pd = PlayerData.instance;
         int hp = pd.health;
         int silk = pd.silk;
+        int blue = pd.healthBlue;
+        // 身上的配装（休息点长椅上可能换过）：拷回快照以后放回去（Codex 审计 0.10.3 F03）。
+        RunGear gear = RunGear.Take(pd);
         bool rest = run.Def.RestAfter(run.Index) || (DebugTools.Instance != null && DebugTools.Instance.ExtraRest(run));
         try
         {
@@ -1258,11 +1291,20 @@ internal sealed class ModeController : MonoBehaviour
         // 从这一刻到进下一个战场，不把旧战场（或休息点）的场景状态写进拷回的数据（下一场可能还是同一个场景）。
         SaveGuard.SuppressLevelState = true;
         run.Index++;
+        // 配装先放回去：血、丝的上限可能跟着装备变。
+        bool gearChanged = gear.PutBack(pd, "pantheon next / 万神殿下一场");
         pd.health = Mathf.Clamp(hp, 1, Mathf.Max(1, pd.CurrentMaxHealth));
         pd.silk = Mathf.Clamp(silk, 0, Mathf.Max(0, pd.CurrentSilkMax));
+        // 蓝血一直带（Codex 审计 0.10.3 F04：以前拷回快照时变回开殿时的值，用掉的补回来、途中得到的丢掉）。去休息点时长椅照游戏的规矩清。
+        pd.healthBlue = Mathf.Max(0, blue);
+        if (gearChanged)
+        {
+            RunGear.Refresh("pantheon next / 万神殿下一场");
+        }
+        // 血、丝、蓝血和换场前一样（HUD 显示的就是这些），不用刷新 HUD。
         // 去休息点的话会在长椅回满，不用再带。
-        run.Carry = rest ? null : (pd.health, pd.silk);
-        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿下一场 / pantheon next: {run}，带过去 / carried hp {pd.health}、silk {pd.silk}{(rest ? "，先去休息点 / resting first" : "")}");
+        run.Carry = rest ? null : (pd.health, pd.silk, pd.healthBlue);
+        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿下一场 / pantheon next: {run}，带过去 / carried hp {pd.health}、silk {pd.silk}、blue {pd.healthBlue}{(gearChanged ? "、换过的配装 / changed loadout" : "")}{(rest ? "，先去休息点 / resting first" : "")}");
         if (rest)
         {
             GoRest(redirect);
@@ -1752,12 +1794,12 @@ internal sealed class ModeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 万神殿进场后把带过来的血和丝再设一次（进入游戏自己的记忆区域时 EnteredNewMapZone 会回满血，见 PantheonRun.Carry）。
+    /// 万神殿进场后把带过来的血、丝和蓝血再设一次（进入游戏自己的记忆区域时 EnteredNewMapZone 会回满血，见 PantheonRun.Carry）。
     /// 只用一次：之后这一场里的回血照常。
     /// </summary>
     private void ReapplyCarry()
     {
-        if (Run?.Carry is not (int hp, int silk))
+        if (Run?.Carry is not (int hp, int silk, int blue))
         {
             return;
         }
@@ -1770,15 +1812,49 @@ internal sealed class ModeController : MonoBehaviour
         }
         int wantHp = Mathf.Clamp(hp, 1, Mathf.Max(1, pd.CurrentMaxHealth));
         int wantSilk = Mathf.Clamp(silk, 0, Mathf.Max(0, pd.CurrentSilkMax));
-        if (pd.health == wantHp && pd.silk == wantSilk)
+        int wantBlue = Mathf.Max(0, blue);
+        if (pd.health == wantHp && pd.silk == wantSilk && pd.healthBlue == wantBlue)
         {
             return;
         }
-        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿：进场后改回带过来的血和丝 / pantheon: restoring carried hp {pd.health}→{wantHp}, silk {pd.silk}→{wantSilk} after entering");
+        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿：进场后改回带过来的血和丝 / pantheon: restoring carried hp {pd.health}→{wantHp}, silk {pd.silk}→{wantSilk}, blue {pd.healthBlue}→{wantBlue} after entering");
+        bool blueChanged = pd.healthBlue != wantBlue;
         pd.health = wantHp;
         pd.silk = wantSilk;
         hero.RefreshSilk();
         EventRegister.SendEvent(EventRegisterEvents.HealthUpdate);
+        if (blueChanged)
+        {
+            SetBlueHealth(pd, hero, wantBlue);
+        }
+    }
+
+    /// <summary>
+    /// 把蓝血改成 want，HUD 的蓝面具跟着对上（例如离开记忆场景时游戏把蓝血清了：GameManager 里 PreMemoryState 还原后 UpdateBlueHealth）。
+    /// 丝之歌的 UPDATE BLUE HEALTH 事件是“清零”：HUD 的 Blue Health Control 收到后移掉蓝面具、调 GameManager.UpdateBlueHealth 把 healthBlue 设成 0，
+    /// 不能拿来“刷新”（0.10.4 实测：发了它蓝血就没了）。加蓝血照游戏自己的做法：GameManager.AddBlueHealthQueued，
+    /// HUD 一格一格加（healthBlue +1、画一个蓝面具）；要变少时先清零再加。
+    /// </summary>
+    private static void SetBlueHealth(PlayerData pd, HeroController hero, int want)
+    {
+        GameManager gm = GameManager.instance;
+        if (gm == null)
+        {
+            pd.healthBlue = want;
+            return;
+        }
+        if (pd.healthBlue > want)
+        {
+            EventRegister.SendEvent(EventRegisterEvents.UpdateBlueHealth);
+            // HUD 不在收这个事件的状态时也要清零。
+            hero.UpdateBlueHealth();
+        }
+        int add = want - pd.healthBlue;
+        for (int i = 0; i < add; i++)
+        {
+            gm.AddBlueHealthQueued();
+        }
+        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿：蓝血排队加回 / pantheon: queued {Mathf.Max(0, add)} blue masks to reach {want}");
     }
 
     private static void Heal()
@@ -2054,7 +2130,7 @@ internal sealed class ModeController : MonoBehaviour
                     // 这个场景的状态也不写进数据；快照在，就不能再开战，回标题重新读档时才清掉。
                     restoreFailed = true;
                     SetState(LoomState.Lobby);
-                    ShowBanner(L.Get("ERR_NEED_RELOAD"), 10f);
+                    ShowNotice(L.Get("ERR_NEED_RELOAD"), 10f);
                 }
                 break;
             case LoomState.ToFight:
@@ -2195,7 +2271,7 @@ internal sealed class ModeController : MonoBehaviour
             {
                 restoreFailed = true;
             }
-            ShowBanner(L.Get("ERR_NEED_RELOAD"), 10f);
+            ShowNotice(L.Get("ERR_NEED_RELOAD"), 10f);
             return;
         }
         if (gm == null || gm.IsInSceneTransition)
@@ -2260,9 +2336,27 @@ internal sealed class ModeController : MonoBehaviour
         }
     }
 
-    /// <summary>提示只写日志、不上屏（界面上不要有文字）。保留这个入口，出错时日志里看得到。</summary>
+    /// <summary>装饰性的提示（进场、回大厅、胜利、死亡）只写日志、不上屏（0.7.0 起照你的要求，界面上不画这些文字）。</summary>
     internal void ShowBanner(string text, float seconds)
     {
         GodhomePlugin.Log.LogInfo($"[Godhome] 提示（不上屏）/ notice (not shown): {text}");
+    }
+
+    /// <summary>
+    /// 出错、存档被拦、要等一下：玩家得知道为什么没反应、下一步怎么做，上屏显示 seconds 秒（LoomUI 底部一行），也写日志
+    /// （Codex 审计 0.10.3 F05：以前只写日志，开始按钮没反应、拒绝存档、还原失败都看不到原因）。
+    /// error = false 是“请稍等”这类，和出错用不同的颜色。
+    /// </summary>
+    internal void ShowNotice(string text, float seconds, bool error = true)
+    {
+        if (error)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] 提示（上屏）/ notice shown: {text}");
+        }
+        else
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 提示（上屏）/ notice shown: {text}");
+        }
+        LoomUI.Instance?.ShowNotice(text, seconds, error);
     }
 }

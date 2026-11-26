@@ -132,7 +132,7 @@ internal sealed partial class DebugTools
                 return;
             }
             promoStarted = true;
-            StartCoroutine(PromoRun(steps, slot));
+            StartPromo(steps, slot);
             return;
         }
         bool playing = !gm.IsMenuScene() && HeroController.SilentInstance != null && gm.GameState == GameState.PLAYING;
@@ -145,12 +145,75 @@ internal sealed partial class DebugTools
             if (Time.unscaledTime - promoSince > 4f)
             {
                 promoStarted = true;
-                StartCoroutine(PromoRun(steps, gm.profileID));
+                StartPromo(steps, gm.profileID);
             }
         }
         else
         {
             promoSince = -1f;
+        }
+    }
+
+    /// <summary>导演协程的句柄、这次录制的编号和槽（停止、换档、关调试时作废它，Codex 审计 0.10.3 D03）。</summary>
+    private Coroutine? promoRoutine;
+    private int promoSession;
+    private int promoRunSlot;
+
+    /// <summary>导演已经进了游戏（menu 段之后）：从这时起每一帧都要满足 PromoOk。</summary>
+    private bool promoInGame;
+
+    private void StartPromo(List<string> steps, int slot)
+    {
+        promoSession++;
+        promoRunSlot = slot;
+        promoInGame = false;
+        promoRoutine = StartCoroutine(PromoRun(steps, slot, promoSession));
+    }
+
+    /// <summary>
+    /// 停掉宣传片：导演协程、自动走路和按键（Puppet / PromoBot）、自检标记，录像收尾。不退出游戏。
+    /// 调试关了、槽不允许了、换了档、组件被禁用都走这里（以前导演协程不在 StopSelfTest 的管辖里，关调试后照样走路、操作，最后还退出游戏）。
+    /// </summary>
+    private void StopPromo(string why)
+    {
+        if (!PromoRunning && promoRoutine == null)
+        {
+            return;
+        }
+        GodhomePlugin.Log.LogWarning($"[Godhome] 宣传片停止 / promo stopped: {why}");
+        Mark("abort", why);
+        if (promoRoutine != null)
+        {
+            StopCoroutine(promoRoutine);
+            promoRoutine = null;
+        }
+        promoSession++;
+        PromoRunning = false;
+        promoInGame = false;
+        PromoBot.On = false;
+        Puppet.Clear();
+        Puppet.Active = false;
+        SelfTestRunning = false;
+        if (PromoRecorder.Instance != null && PromoRecorder.Recording && isActiveAndEnabled)
+        {
+            StartCoroutine(PromoRecorder.Instance.End());
+        }
+    }
+
+    /// <summary>每帧（调试关着时也跑）：宣传片在跑，条件却不满足了就停。</summary>
+    private void PromoGuard()
+    {
+        if (!PromoRunning)
+        {
+            return;
+        }
+        if (!DebugOn || !GodhomeConfig.IsSlotEnabled(promoRunSlot))
+        {
+            StopPromo("debug off or slot not allowed / 调试关了或槽不允许");
+        }
+        else if (promoInGame && !PromoOk(promoRunSlot))
+        {
+            StopPromo($"slot/debug/mode not ok (profile {GameManager.UnsafeInstance?.profileID}, inMode {ModeController.Instance?.InMode})");
         }
     }
 
@@ -160,6 +223,8 @@ internal sealed partial class DebugTools
         if (PromoRunning && Time.frameCount - selfTestBeatFrame > 3600)
         {
             GodhomePlugin.Log.LogWarning("[Godhome] 宣传片导演 3600 帧没有心跳，停止录像 / promo director stopped beating, ending the recording");
+            int session = ++promoSession;
+            promoRoutine = null;
             PromoRunning = false;
             PromoBot.On = false;
             Puppet.Clear();
@@ -167,15 +232,31 @@ internal sealed partial class DebugTools
             SelfTestRunning = false;
             if (PromoRecorder.Instance != null)
             {
-                StartCoroutine(PromoQuitAfter(PromoRecorder.Instance.End()));
+                StartCoroutine(PromoQuitAfter(PromoRecorder.Instance.End(), session));
             }
         }
     }
 
-    private IEnumerator PromoQuitAfter(IEnumerator end)
+    private IEnumerator PromoQuitAfter(IEnumerator end, int session)
     {
         yield return end;
+        yield return PromoQuit(session, "watchdog / 看门狗");
+    }
+
+    /// <summary>录完退出游戏：等编码器收尾（不堵主线程，最多 3 分钟），再停 3 秒；等完了还是这一次、调试还开着才退出。</summary>
+    private IEnumerator PromoQuit(int session, string why)
+    {
+        float until = Time.unscaledTime + 180f;
+        while (PromoRecorder.Instance != null && PromoRecorder.Instance.Closing && Time.unscaledTime < until)
+        {
+            yield return null;
+        }
         yield return new WaitForSecondsRealtime(3f);
+        if (session != promoSession || !DebugOn || !GodhomeConfig.IsSlotEnabled(promoRunSlot))
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 宣传片：条件变了，不退出游戏 / promo: conditions changed, not quitting（{why}）");
+            yield break;
+        }
         Application.Quit();
     }
 
@@ -194,7 +275,7 @@ internal sealed partial class DebugTools
 
     private static void Mark(string ev, string detail = "") => PromoRecorder.Mark(ev, detail);
 
-    private IEnumerator PromoRun(List<string> steps, int slot)
+    private IEnumerator PromoRun(List<string> steps, int slot, int session)
     {
         PromoRunning = true;
         Beat();
@@ -208,20 +289,25 @@ internal sealed partial class DebugTools
         {
             GodhomePlugin.Log.LogError($"[Godhome] 宣传片：录像开不了，不跑 / promo: recording could not start: {err}");
             PromoRunning = false;
+            promoRoutine = null;
             yield break;
         }
         Puppet.Active = true;
+        bool aborted = false;
         foreach (string step in steps)
         {
             Beat();
             if (step != "menu" && !PromoOk(slot))
             {
                 Mark("abort", $"slot/debug not ok before {step} (profile {GameManager.instance?.profileID}, inMode {ModeController.Instance?.InMode})");
+                aborted = true;
                 break;
             }
             if (step != "menu")
             {
                 SelfTestRunning = true;
+                // 从这一段起每帧核对槽、存档对象、调试开关（PromoGuard），不满足马上停。
+                promoInGame = true;
             }
             Mark("step", step);
             switch (step)
@@ -261,9 +347,16 @@ internal sealed partial class DebugTools
         Beat();
         yield return rec.End();
         PromoRunning = false;
+        promoInGame = false;
+        promoRoutine = null;
+        if (aborted)
+        {
+            // 条件不满足提前结束的：只收尾，不替人退出游戏。
+            GodhomePlugin.Log.LogInfo($"[Godhome] 宣传片提前结束，不退出游戏 / promo aborted, not quitting: {rec.BaseName}");
+            yield break;
+        }
         GodhomePlugin.Log.LogInfo($"[Godhome] 宣传片录完，退出游戏 / promo finished, quitting: {rec.BaseName}");
-        yield return new WaitForSecondsRealtime(3f);
-        Application.Quit();
+        yield return PromoQuit(session, "finished / 录完");
     }
 
     // ───────────────────────────── 走路 ─────────────────────────────

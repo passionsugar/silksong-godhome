@@ -135,6 +135,11 @@
 }
 ```
 
+- `required`（0.10.4，Codex 审计 0.10.3）：`patch` 和 `enter` 的每一项都可以写 `"required": true`，表示这一步不成功这场就打不了。
+  `patch` 里的必需项：这一场的场景都来了（或者等附加场景到头了）还没打上，就按“场地出错”回大厅（`Arena.Unwinnable`），屏幕上提示、不记尝试；
+  `enter` 里的必需项：`when` 等不到、或者这一步执行失败，同样按场地出错处理（`Arena.MarkFatal`），后面的进场步骤不再执行。
+  不写或写 `false` 的照旧：没做到只记警告。`required` 不是布尔值时读表记警告、按 `false` 算；写在 `arena.enter` 以外的 FSM 步骤上也记警告（没有意义）。
+  现在标了必需的：针姬（pinstress）进场的 `TEST`、`Accept` 两步和 `NO PINSTRESS` 的 `goto` 补丁（缺了就不会开打）。
 - `hudGrace`：开战以后 HUD 收着、人能操作（`acceptingInput`、没交出控制、没死），连续这么多秒（不算暂停）就叫回来（`ModeController.CheckFightHud`）。原初罪者的神龛收起 HUD 以后没有地方再叫回来，靠默认 2 秒叫回。开场演出本来就收着 HUD、演完自己会叫回来、演出里人又能动的写长一点：崇高圣母灵丝的 `Challenge Cam` 和 `Intro Up` 发 OUT，原版到 `Silk Boss` 的 `Begin` 才发 IN（挑战以后约 20 秒，0.10.3 实测 20.5 秒），写 45。
 
 - `noAdditive`：附加场景的加载器在 `OnEnable` / `Start` 里调 `TryTestLoad` 决定加不加载（反编译 SceneAdditiveLoadConditional.cs），比 `sceneLoaded` 早，加载时关物体来不及，所以在 `TryTestLoad` 前置里拦下。例如沙克拉：Greymoor_08 按原条件还加载荒沼翼主的备用地点 `Greymoor_08_boss`，荒沼翼主飞进她的 `Enemy Range`，她就去打荒沼翼主（同伴模式），不是和玩家切磋。战斗中真正附加加载了这一场以外的场景在 `sceneLoaded` 里记一行警告（`TryTestLoad` 返回 true 不等于加载了：别的加载器查 `otherLoaderBlacklist` 时也调它）；拦下的日志每场每个加载器只记一次。拦下以后，把它列进 `otherLoaderBlacklist` 的加载器会当它没在加载：Greymoor_08 只有沙克拉自己的加载器列了它，而那个是强制加载的，不受影响（场景导出核实）。

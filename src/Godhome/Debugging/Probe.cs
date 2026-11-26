@@ -45,6 +45,7 @@ internal sealed class Probe : MonoBehaviour
             return;
         }
         Probe p = host.AddComponent<Probe>();
+        installed = cfg;
         foreach (string part in cfg.Split(',').Select(s => s.Trim()).Where(s => s.Length > 0))
         {
             if (part == "hud")
@@ -119,7 +120,30 @@ internal sealed class Probe : MonoBehaviour
     /// </summary>
     private static bool Allowed(GameManager? gm) =>
         gm != null && GodhomeSave.IsGodhome(gm) && GodhomeConfig.IsSlotEnabled(gm.profileID)
-        && GodhomeConfig.DebugMode.Value && GodhomeConfig.DebugProbe.Value.Trim().Length > 0;
+        && GodhomeConfig.DebugMode.Value && SameConfig();
+
+    /// <summary>启动时按哪份配置装的探针（探什么只在启动时定）。</summary>
+    private static string installed = "";
+    private static bool warnedChanged;
+
+    /// <summary>
+    /// 运行中改了 Debug.Probe（Codex 审计 0.10.3 DBG03）：探针只在启动时按配置装，改成别的不会照新的探，清空也只是停。
+    /// 和启动时不一样就停下、记一次“要重启”，不再按旧配置继续探。
+    /// </summary>
+    private static bool SameConfig()
+    {
+        string now = GodhomeConfig.DebugProbe.Value.Trim();
+        if (now == installed)
+        {
+            return now.Length > 0;
+        }
+        if (!warnedChanged)
+        {
+            warnedChanged = true;
+            GodhomePlugin.Log.LogWarning($"[Godhome] 探针配置改了（{installed} → {(now.Length > 0 ? now : "空 / empty")}），停下；要重启游戏才按新的来 / probe config changed; stopped, restart the game to apply it");
+        }
+        return false;
+    }
 
     private void Update()
     {

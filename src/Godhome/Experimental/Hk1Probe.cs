@@ -138,7 +138,9 @@ internal static class Hk1Probe
             bool additive = mode is "additive" or "both" or "";
             bool native = mode is "native" or "both";
             Log($"方式 / mode: {mode}（叠加 / additive={additive}，原生转场 / native={native}）");
-            assets = UnitySceneRepackerPlugin.RepackedAssets(game, "godhome-hk1");
+            // 用自己的缓存名，不和正式导入（Hk1Assets.PackName）共用（Codex 审计 0.10.3 D05）：UnitySceneRepacker 按缓存目录 + 名字
+            // 决定请求表、包和目录文件，两边请求的场景不同，共用一个名字会互相重写对方的缓存。
+            assets = UnitySceneRepackerPlugin.RepackedAssets(game, Hk1Assets.PackName + "-probe");
             var reqs = entries.Select(e => (e.Name, e.Gate, Scene: assets.RequestScene(e.Name))).ToList();
             var sw = Stopwatch.StartNew();
             assets.Prepare();

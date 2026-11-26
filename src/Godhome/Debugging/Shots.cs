@@ -48,7 +48,10 @@ internal static class Shots
             RenderTexture? rt = null;
             Texture2D? tex = null;
             RenderTexture? prev = RenderTexture.active;
-            var saved = cams.ConvertAll(c => (c.targetTexture, c.rect, c.aspect));
+            // 宽高比原来是自动算的（等于视口的宽高比）还是手动设的：还原时照原来的方式（Codex 审计 0.10.3 DBG01：
+            // 以前一律写回数值，自动的镜头变成了手动，之后窗口大小变了还用旧比例）。
+            var saved = cams.ConvertAll(c => (c.targetTexture, c.rect, c.aspect,
+                auto: c.pixelHeight > 0 && Mathf.Abs(c.aspect - c.pixelWidth / (float)c.pixelHeight) < 0.002f));
             try
             {
                 rt = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.ARGB32);
@@ -80,7 +83,14 @@ internal static class Shots
                     {
                         cams[i].targetTexture = saved[i].targetTexture;
                         cams[i].rect = saved[i].rect;
-                        cams[i].aspect = saved[i].aspect;
+                        if (saved[i].auto)
+                        {
+                            cams[i].ResetAspect();
+                        }
+                        else
+                        {
+                            cams[i].aspect = saved[i].aspect;
+                        }
                     }
                 }
                 RenderTexture.active = prev;
@@ -264,10 +274,11 @@ internal static class Shots
     }
 
     /// <summary>
-    /// 自检截图（连界面）：离屏画进一张图，存到 path，成功时把文件名加进 names。
+    /// 自检截图（连界面）：离屏画进一张 1440×810 的图（CaptureWithUi 的默认尺寸），存到 path，成功时把文件名加进 names。
     /// 不用屏幕截图：远程桌面断开时屏幕截图是全黑的（2026-11-24 早上一整轮 200 张全黑，按亮度核对过）。
+    /// 以前有个 width 参数（默认 800）但根本没传下去（Codex 审计 0.10.3 DBG02），去掉了，免得以为能改尺寸。
     /// </summary>
-    internal static IEnumerator Capture(string path, List<string>? names, int width = Width)
+    internal static IEnumerator Capture(string path, List<string>? names)
     {
         DateTime before = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
         yield return CaptureWithUi(path);

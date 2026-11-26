@@ -13,7 +13,9 @@ A boss-revisit and pantheon boss-rush mod for *Hollow Knight: Silksong* (BepInEx
 
 ## Install
 
-Download the archive from [Releases](https://github.com/passionsugar/silksong-godhome/releases) and follow the `README.txt` inside. You need:
+**One-click install**: download the archive from [Releases](https://github.com/passionsugar/silksong-godhome/releases), extract all of it, close the game and double-click `install.bat`. It finds the game in your Steam libraries, installs BepInEx and the dependency plugins from Thunderstore if they are missing (plus UnitySceneRepacker when Hollow Knight is installed), then copies the mod to `BepInEx\plugins\Godhome`. It never touches your saves or the game's own files; `uninstall.bat` removes the mod. For a game installed elsewhere, run `install.ps1 -GameDir "<game folder>"`. Details and manual install steps are in the `README.txt` inside the archive.
+
+You need (the installer sets these up):
 
 - *Hollow Knight: Silksong* (tested on game version 1.0.30000)
 - BepInEx 5 (`silksong_modding-BepInExPack_Silksong` 1.0.3)

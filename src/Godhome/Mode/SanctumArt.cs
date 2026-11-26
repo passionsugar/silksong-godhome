@@ -221,6 +221,8 @@ internal static class SanctumArt
     /// <summary>
     /// 在 Addressables 目录里找每个图集包的位置。键是包名（例如 weave_gate.spriteatlas_&lt;hash&gt;.bundle），
     /// 用“.spriteatlas”前面那段（到路径分隔符为止）当图集名。只做一次。
+    /// 先建在局部字典里，整个扫完才发布（Codex 审计 0.10.3：以前中途出错时半张表留在静态字典里，Count > 0 以后再也不重扫）；
+    /// 出错就不发布，下次再扫。
     /// </summary>
     private static void IndexLocations()
     {
@@ -228,7 +230,7 @@ internal static class SanctumArt
         {
             return;
         }
-        locations = new Dictionary<string, IResourceLocation>(StringComparer.OrdinalIgnoreCase);
+        var found = new Dictionary<string, IResourceLocation>(StringComparer.OrdinalIgnoreCase);
         int keys = 0;
         try
         {
@@ -248,26 +250,28 @@ internal static class SanctumArt
                     }
                     int start = Math.Max(k.LastIndexOf('/', i - 1), k.LastIndexOf('\\', i - 1)) + 1;
                     string name = k.Substring(start, i - start);
-                    if (name.Length == 0 || locations.ContainsKey(name))
+                    if (name.Length == 0 || found.ContainsKey(name))
                     {
                         continue;
                     }
-                    if (!locator.Locate(k, typeof(IAssetBundleResource), out IList<IResourceLocation> found) || found == null)
+                    if (!locator.Locate(k, typeof(IAssetBundleResource), out IList<IResourceLocation> locs) || locs == null)
                     {
                         continue;
                     }
-                    IResourceLocation? bl = found.FirstOrDefault(l => l != null && typeof(IAssetBundleResource).IsAssignableFrom(l.ResourceType));
+                    IResourceLocation? bl = locs.FirstOrDefault(l => l != null && typeof(IAssetBundleResource).IsAssignableFrom(l.ResourceType));
                     if (bl != null)
                     {
-                        locations[name] = bl;
+                        found[name] = bl;
                     }
                 }
             }
         }
         catch (Exception e)
         {
-            GodhomePlugin.Log.LogWarning($"[Godhome] 查图集目录出错 / atlas catalog scan failed: {e.Message}");
+            GodhomePlugin.Log.LogWarning($"[Godhome] 查图集目录出错，这次不用，下次重扫 / atlas catalog scan failed; not using it, will rescan next time（已找到 / found {found.Count}）: {e.Message}");
+            return;
         }
+        locations = found;
         GodhomePlugin.Log.LogInfo($"[Godhome] 图集目录 / atlas catalog: {locations.Count} 个图集包 / atlas bundles（扫了 {keys} 个键 / keys）");
     }
 }

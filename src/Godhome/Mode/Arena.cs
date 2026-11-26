@@ -1311,6 +1311,12 @@ internal static class Arena
                 if (fsm == null || !SceneTools.InState(fsm, s.When))
                 {
                     GodhomePlugin.Log.LogWarning($"[Godhome]   进场步骤没等到状态 / enter step: {s.Path}::{s.Fsm} never reached '{s.When}' (now '{fsm?.ActiveStateName ?? "-"}')");
+                    if (s.Required && same())
+                    {
+                        // 开战离不开这一步：这一场开不了，按场地出错回大厅（Codex 审计 0.10.3：以前等不到就接着往下，Watch 不会因为“永远没开战”回大厅）。
+                        MarkFatal(serial, $"必需的进场步骤没等到状态 / a required enter step never reached its state: {s.Path}::{s.Fsm} '{s.When}' (now '{fsm?.ActiveStateName ?? "-"}')");
+                        yield break;
+                    }
                 }
             }
             // 暂停中不执行（发事件、开关物体），等继续游戏。
@@ -1322,7 +1328,11 @@ internal static class Arena
             {
                 yield break;
             }
-            SceneTools.RunStep(s, scenes);
+            if (!SceneTools.RunStep(s, scenes) && s.Required)
+            {
+                MarkFatal(serial, $"必需的进场步骤没执行成 / a required enter step failed: {s}");
+                yield break;
+            }
         }
     }
 
@@ -1504,6 +1514,28 @@ internal static class Arena
     /// </summary>
     private static string? Unwinnable(BossDef b)
     {
+        // 表里标了 required 的补丁（开战离不开它）：这一场的场景都准备过了还没打上，就开不了战（Codex 审计 0.10.3）。
+        // 还有场景没来（附加场景晚到）时最多等 ControllerWait 秒。模板 FSM 醒来后重打失败的，OnFsmAwake 会把它从 patchDone 里拿掉。
+        if (b.Arena.Patch.Any(p => p.Required))
+        {
+            bool pending = !ModeController.ScenesOf(b).All(preparedNames.Contains) && sinceEntered <= ControllerWait;
+            var missing = new List<string>();
+            for (int i = 0; i < b.Arena.Patch.Count; i++)
+            {
+                if (b.Arena.Patch[i].Required && !patchDone.Contains(i))
+                {
+                    missing.Add($"{b.Arena.Patch[i]}: {(patchFail.TryGetValue(i, out string? why) ? why : "没找到物体 / target not found")}");
+                }
+            }
+            if (missing.Count > 0)
+            {
+                if (pending)
+                {
+                    return null;
+                }
+                return $"必需的补丁没打上，这一场开不了 / a required arena.patch is not in place: {string.Join("; ", missing)}";
+            }
+        }
         if (b.Arena.End.Count > 0)
         {
             bool scenesPending = !ModeController.ScenesOf(b).All(preparedNames.Contains) && sinceEntered <= ControllerWait;

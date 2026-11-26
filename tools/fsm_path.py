@@ -2,9 +2,13 @@
 
 用法: python -I fsm_path.py <dump.txt> <FSM 标题正则> [层数=6] [每个动作最多字符=220]
 """
+import os
 import re
 import sys
 from collections import deque
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dumpfmt import parse_fsm_head  # noqa: E402
 
 
 def parse(path, header_re):
@@ -14,7 +18,8 @@ def parse(path, header_re):
     if i is None:
         sys.exit(f"no FSM matches {header_re!r}")
     header = lines[i]
-    start = re.search(r"start='([^']*)'", header).group(1)
+    # 起始状态按导出格式解（两种引号、转义都认；读不懂就报错，Codex 审计 0.10.3 PT04）。
+    start = parse_fsm_head(header, f"{path}:{i + 1}")[2]
     states, glob, cur, extra = {}, [], None, []
     for l in lines[i + 1:]:
         if l.startswith("=== FSM") or l.startswith("## "):

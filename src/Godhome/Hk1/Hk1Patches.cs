@@ -288,7 +288,10 @@ internal static class StatueStateSetPatch
         {
             return true;
         }
+        // 改的是我们自己的 Slot，value 只读：分析器 Harmony003 误报“改了非 ref 参数”。
+#pragma warning disable Harmony003
         s.UsingAlt = value.usingAltVersion;
+#pragma warning restore Harmony003
         return false;
     }
 }
@@ -324,7 +327,10 @@ internal static class DreamStatueStateSetPatch
         {
             return true;
         }
+        // 同上：改的是 Slot，不是参数（Harmony003 误报）。
+#pragma warning disable Harmony003
         s.UsingAlt = value.usingAltVersion;
+#pragma warning restore Harmony003
         return false;
     }
 }
@@ -460,7 +466,10 @@ internal static class SummaryBoardPatch
     /// <summary>前作的板按 44 行排（4 列，每列 11 行，实机截图）。我们 50 行，第 5 列排到板外：每列多排几行、行高按比例缩，总高度不变。</summary>
     private const int Columns = 4;
 
+    // 普通的排版辅助函数，不是补丁：Harmonize 按类扫描时误报 HARMONIZE004，HarmonyX 不会把它当补丁（没有标记、名字也不是约定名）。
+#pragma warning disable HARMONIZE004
     private static void Fit(Transform list, int rows)
+#pragma warning restore HARMONIZE004
     {
         GridLayoutGroup grid = list.GetComponent<GridLayoutGroup>();
         if (grid == null)

@@ -344,13 +344,14 @@ internal static class ReturnToMainMenuPatch
 /// <summary>
 /// 前作留下的神居结局：神居存档里播结局动画后，游戏会去加载 GG_End_Sequence（CinematicPlayer.cs:739），
 /// 丝之歌里没有这个场景。改成普通的字幕场景，免得卡死。
+/// 只在神居存档里改（Codex 审计 0.10.3：别的模组真的提供了这个场景、在普通存档里加载时不拦）。
 /// </summary>
 [HarmonyPatch(typeof(GameManager), nameof(GameManager.LoadScene))]
 internal static class LoadSceneGuardPatch
 {
     private static void Prefix(ref string destScene)
     {
-        if (destScene == "GG_End_Sequence")
+        if (destScene == "GG_End_Sequence" && ModeController.Instance != null && ModeController.Instance.InMode)
         {
             GodhomePlugin.Log.LogWarning("[Godhome] 丝之歌里没有前作的神居结局场景，改去普通字幕 / GG_End_Sequence does not exist in Silksong, loading End_Credits instead");
             destScene = "End_Credits";

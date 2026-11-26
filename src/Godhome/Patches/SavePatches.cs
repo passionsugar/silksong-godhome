@@ -17,6 +17,10 @@ namespace Godhome;
 // SaveGame 的 withAutoSave 改成 false（只写存档、不附带恢复点）。
 //
 // SaveGuard.BlockAll（战斗中快照意外丢失）时一律拦下，回到标题画面才放开。
+//
+// 分析器 Harmonize 1.0.3 只认 Prefix / Postfix / Transpiler，不认 [HarmonyFinalizer]，这几个 Finalizer 会报 HARMONIZE004。
+// HarmonyX 是认的（异常路径要靠它把实时数据换回来），不能为了消告警改成 Postfix（Codex 审计 0.10.3 第 6.2 节）。
+#pragma warning disable HARMONIZE004
 
 [HarmonyPatch(typeof(GameManager), "SaveGame", new[] { typeof(int), typeof(Action<bool>), typeof(bool), typeof(AutoSaveName) })]
 internal static class SaveGamePatch
@@ -209,7 +213,7 @@ internal static class SaveLevelStatePatch
 internal static class SavePatchUtil
 {
     /// <summary>存档被拦下时告诉玩家（原函数被跳过，游戏自己的“存档失败”提示也就没了，Codex 复审）。</summary>
-    internal static void NotifyBlocked() => ModeController.Instance?.ShowBanner(L.Get("ERR_SAVE_BLOCKED"), 6f);
+    internal static void NotifyBlocked() => ModeController.Instance?.ShowNotice(L.Get("ERR_SAVE_BLOCKED"), 8f);
 
     internal static void ThrowIfBlocked(string what)
     {

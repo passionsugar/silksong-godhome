@@ -125,8 +125,9 @@ internal static class PantheonCatalog
                     BossDef? b = bid != null ? BossCatalog.Find(bid) : null;
                     if (b == null)
                     {
-                        GodhomePlugin.Log.LogWarning($"[Godhome] 万神殿 {id}：Boss 表里没有 / not in the boss table: {t}");
-                        continue;
+                        // 缺一个就整座不开（Codex 审计 0.10.3）：以前跳过这一个照样开，路线变短、休息点位置还按原来的数，
+                        // 完成记录却照常给（数据表混装、只更新了一半时会这样）。
+                        throw new InvalidDataException($"Boss 表里没有 / not in the boss table: {t}（整座万神殿不开 / the whole pantheon is disabled）");
                     }
                     p.Bosses.Add(b);
                 }

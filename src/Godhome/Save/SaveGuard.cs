@@ -3,6 +3,7 @@ using System.Collections;
 using System.Threading.Tasks;
 using HarmonyLib;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 
 namespace Godhome;
@@ -253,8 +254,7 @@ internal static class SaveGuard
     {
         RequireOwner(gm, "还原 / restore (" + when + ")");
         SaveGameData fresh = Fresh();
-        JsonSerializer ser = Traverse.Create(typeof(SaveDataUtility)).Field("_serializer").GetValue<JsonSerializer>()
-            ?? throw new InvalidOperationException("[Godhome] SaveDataUtility._serializer is null");
+        JsonSerializer ser = Serializer();
         int n1 = CopyContract(ser, fresh.playerData, gm.playerData);
         int n2 = CopyContract(ser, fresh.sceneData, gm.sceneData);
         if (!VerifyRestored(gm, when))
@@ -379,6 +379,42 @@ internal static class SaveGuard
     }
 
     private static bool warnedQueue;
+
+    /// <summary>游戏存档用的序列化器（SaveDataUtility._serializer）。</summary>
+    private static JsonSerializer Serializer()
+        => Traverse.Create(typeof(SaveDataUtility)).Field("_serializer").GetValue<JsonSerializer>()
+            ?? throw new InvalidOperationException("[Godhome] SaveDataUtility._serializer is null");
+
+    /// <summary>
+    /// 两份存档子数据（例如纹章槽位 ToolCrestsData）按游戏的序列化器写出来是否一样。比不出来（出错）算不一样，记一次警告。
+    /// </summary>
+    internal static bool SameJson(object? a, object? b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return true;
+        }
+        if (a == null || b == null)
+        {
+            return false;
+        }
+        try
+        {
+            JsonSerializer ser = Serializer();
+            return JToken.DeepEquals(JToken.FromObject(a, ser), JToken.FromObject(b, ser));
+        }
+        catch (Exception e)
+        {
+            if (!warnedCompare)
+            {
+                warnedCompare = true;
+                GodhomePlugin.Log.LogWarning($"[Godhome] 比较存档数据出错，当作不一样 / comparing save data failed, treating as different: {e.Message}");
+            }
+            return false;
+        }
+    }
+
+    private static bool warnedCompare;
 
     private static int CopyContract(JsonSerializer ser, object src, object dst)
     {

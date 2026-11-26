@@ -2901,14 +2901,16 @@
             "path": "Pinstress Control/Pinstress Scene/Pinstress Boss/NPC",
             "fsm": "NPC Control",
             "when": "Snow Sleep",
-            "event": "TEST"
+            "event": "TEST",
+            "required": true
           },
           {
             "type": "state",
             "path": "Pinstress Control/Pinstress Scene/Pinstress Boss/NPC",
             "fsm": "NPC Control",
             "when": "Meet Ready",
-            "state": "Accept"
+            "state": "Accept",
+            "required": true
           }
         ],
         "patch": [
@@ -2918,7 +2920,8 @@
             "fsm": "Control",
             "from": "Check",
             "event": "NO PINSTRESS",
-            "to": "Pinstress"
+            "to": "Pinstress",
+            "required": true
           }
         ]
       },

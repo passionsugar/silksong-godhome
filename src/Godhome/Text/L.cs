@@ -36,13 +36,15 @@ internal static class L
         }
     }
 
+    /// <summary>游戏语言是中文（简体 ZH，以及枚举里别的 ZH_* 地区写法）。</summary>
     internal static bool IsChinese
     {
         get
         {
             try
             {
-                return Language.CurrentLanguage() == LanguageCode.ZH;
+                LanguageCode code = Language.CurrentLanguage();
+                return code == LanguageCode.ZH || code.ToString().StartsWith("ZH_", StringComparison.Ordinal);
             }
             catch (Exception)
             {
@@ -51,15 +53,19 @@ internal static class L
         }
     }
 
-    /// <summary>秒数 → m:ss.f</summary>
+    /// <summary>
+    /// 秒数 → m:ss.f。先把总时间舍入到十分之一秒再拆分钟和秒（Codex 审计 0.10.3 F08：以前先截分钟再舍入秒，59.95 秒显示成 0:60.0）。
+    /// 负数、非有限值（NaN、无穷）显示 --。
+    /// </summary>
     internal static string Time(float seconds)
     {
-        if (seconds < 0)
+        if (seconds < 0 || float.IsNaN(seconds) || float.IsInfinity(seconds))
         {
             return "--";
         }
-        int m = (int)(seconds / 60);
-        float s = seconds - m * 60;
-        return $"{m}:{s:00.0}";
+        long tenths = (long)Math.Round(seconds * 10.0, MidpointRounding.AwayFromZero);
+        long m = tenths / 600;
+        long rest = tenths % 600;
+        return $"{m}:{rest / 10:00}.{rest % 10}";
     }
 }

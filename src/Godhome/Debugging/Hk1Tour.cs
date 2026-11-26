@@ -697,8 +697,12 @@ internal static class Hk1Tour
         if (GodhomeConfig.DebugQuitAfterSelfTest.Value && Same())
         {
             yield return new WaitForSecondsRealtime(5f);
-            GodhomePlugin.Log.LogInfo("[Godhome] 前作巡视后退出游戏 / quitting after the hk1 tour");
-            Application.Quit();
+            // 等的 5 秒里关了调试、取消了退出、换了档：不退（Codex 审计 0.10.3 D04）。
+            if (GodhomeConfig.DebugQuitAfterSelfTest.Value && Same())
+            {
+                GodhomePlugin.Log.LogInfo("[Godhome] 前作巡视后退出游戏 / quitting after the hk1 tour");
+                Application.Quit();
+            }
         }
     }
 }

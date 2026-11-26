@@ -13,7 +13,9 @@
 
 ## 安装
 
-下载 [Releases](https://github.com/passionsugar/silksong-godhome/releases) 里的压缩包，照里面的 `README.txt` 装。需要：
+**一键安装**：下载 [Releases](https://github.com/passionsugar/silksong-godhome/releases) 里的压缩包，整个解压出来，关掉游戏，双击 `install.bat`。它会自动找到 Steam 里的游戏，缺 BepInEx 和前置插件的从 Thunderstore 下载装好（本机有前作时连 UnitySceneRepacker 一起装），再把模组复制进 `BepInEx\plugins\Godhome`。不碰存档和游戏原文件；卸载双击 `uninstall.bat`。游戏装在别处的，用 `install.ps1 -GameDir "<游戏文件夹>"`。详细说明和手动安装见压缩包里的 `README.txt`。
+
+需要（一键安装会自动装）：
 
 - 正版《空洞骑士：丝之歌》（测试用的版本 1.0.30000）
 - BepInEx 5（`silksong_modding-BepInExPack_Silksong` 1.0.3）

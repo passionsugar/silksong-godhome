@@ -30,8 +30,22 @@ internal static class ArrivalWatch
     private static Vector2 landed;
     private static readonly List<string> hits = new();
 
-    /// <summary>这次自检里进场挨过打的场次（自检结束时汇总后清掉）。</summary>
+    /// <summary>这一场里人还没恢复操作（进场动画、吼叫定身、转场中）时碰到的伤害次数。</summary>
+    private static int beforeControl;
+
+    /// <summary>
+    /// 这次自检里进场挨过打的场次（自检结束时汇总后清掉）。自检报告也列出来（Codex 审计 0.10.3 第 6.4 节：
+    /// 以前只写日志，报告里照样“全部通过”）。“恢复操作前”的伤害玩家躲不开，是落点要改；之后的是正常交战，只作参考。
+    /// </summary>
     private static readonly List<string> flagged = new();
+
+    /// <summary>进场挨过打的场次里，有恢复操作前的伤害的有几场。</summary>
+    private static int flaggedBefore;
+
+    /// <summary>给自检报告用：进场挨过打的场次（有“操作前”的排前面写明）。</summary>
+    internal static IReadOnlyList<string> Flagged => flagged;
+
+    internal static int FlaggedBeforeControl => flaggedBefore;
 
     internal static bool Watching => watched >= 0f && watched <= Window;
 
@@ -46,6 +60,7 @@ internal static class ArrivalWatch
         boss = b.Id;
         landed = at;
         hits.Clear();
+        beforeControl = 0;
         watched = 0f;
         int mine = ++serial;
         string near = NearestBoss(b, at);
@@ -171,7 +186,8 @@ internal static class ArrivalWatch
         watched = -1f;
         string summary = hits.Count == 0
             ? "没碰到伤害 / no damage"
-            : $"碰到伤害 {hits.Count} 次 / {hits.Count} damage calls：" + string.Join("；", hits.GroupBy(h => h).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key).Take(8));
+            : $"碰到伤害 {hits.Count} 次（恢复操作前 {beforeControl} 次）/ {hits.Count} damage calls ({beforeControl} before control)："
+                + string.Join("；", hits.GroupBy(h => h).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key).Take(8));
         string line = $"[Godhome] 进场检查 / arrival check {boss}：落点 / landed ({landed.x:0.0}, {landed.y:0.0})，最近的 Boss / nearest boss {near}；{Window:0} 秒内 / within {Window:0} s {summary}";
         if (hits.Count == 0)
         {
@@ -180,7 +196,28 @@ internal static class ArrivalWatch
         else
         {
             GodhomePlugin.Log.LogWarning(line);
-            flagged.Add($"{boss}（{hits.Count}：{hits[0]}）");
+            string kind = beforeControl > 0
+                ? $"恢复操作前 / before control {beforeControl}"
+                : "都在恢复操作后 / all after control";
+            if (beforeControl > 0)
+            {
+                flaggedBefore++;
+            }
+            flagged.Add($"{boss}（{hits.Count} 次 / hits，{kind}：{hits[0]}）");
+        }
+    }
+
+    /// <summary>人能不能操作了：接受输入、没被收走控制、不在转场里（和 HeroController.CanInput 的主要条件一样）。</summary>
+    private static bool HasControl(HeroController hero)
+    {
+        try
+        {
+            return hero.acceptingInput && !hero.controlReqlinquished
+                && hero.transitionState == HeroTransitionState.WAITING_TO_TRANSITION;
+        }
+        catch
+        {
+            return true;
         }
     }
 
@@ -195,7 +232,12 @@ internal static class ArrivalWatch
         {
             Vector2 p = hero.transform.position;
             string src = go != null ? SceneTools.PathOf(go.transform) : "-";
-            hits.Add($"{watched:0.0}s {src} 伤害 / dmg {damage} {hazard} 人在 / hero ({p.x:0.0}, {p.y:0.0})");
+            bool control = HasControl(hero);
+            if (!control)
+            {
+                beforeControl++;
+            }
+            hits.Add($"{watched:0.0}s {(control ? "" : "[操作前 / no control] ")}{src} 伤害 / dmg {damage} {hazard} 人在 / hero ({p.x:0.0}, {p.y:0.0})");
         }
         catch (Exception e)
         {
@@ -212,8 +254,15 @@ internal static class ArrivalWatch
         }
         GodhomePlugin.Log.LogInfo(flagged.Count == 0
             ? "[Godhome] 进场检查汇总 / arrival summary：没有场次进场就碰到伤害 / no fight took damage on arrival"
-            : $"[Godhome] 进场检查汇总 / arrival summary：{flagged.Count} 场进场就碰到伤害 / fights hit on arrival：{string.Join("，", flagged)}");
+            : $"[Godhome] 进场检查汇总 / arrival summary：{flagged.Count} 场进场就碰到伤害，其中 {flaggedBefore} 场在恢复操作前 / {flagged.Count} fights hit on arrival, {flaggedBefore} before control：{string.Join("，", flagged)}");
+        Reset();
+    }
+
+    /// <summary>新一轮自检开始时清掉上一轮的记录（中止的那轮没走到 Summary）。</summary>
+    internal static void Reset()
+    {
         flagged.Clear();
+        flaggedBefore = 0;
     }
 
     /// <summary>离落点最近的 Boss 物体（表里的 bossObjects）：碰撞体最近点的距离，物体关着的也列（标“关”）。</summary>

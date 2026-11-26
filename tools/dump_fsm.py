@@ -5,7 +5,9 @@
 基本类型在 byteData）。
 
 用法: python -I dump_fsm.py <monoscripts.bundle> <out_dir> <scene.bundle> [...]
-每个场景输出 <out_dir>/<场景名>.txt
+每个场景输出 <out_dir>/<场景名>.txt。有场景失败时退出码是 1。
+
+文本格式（字符串引号、动作行）见 dumpfmt.py，读它的工具（arena_draft、scan_wakes、fsm_path、wave_scan）共用。
 """
 import math
 import os
@@ -15,6 +17,9 @@ import time
 import traceback
 
 import UnityPy
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dumpfmt import q  # noqa: E402
 
 UnityPy.config.FALLBACK_UNITY_VERSION = "6000.0.50f1"
 
@@ -133,21 +138,28 @@ class Scene:
         return obj.type.name
 
     def world(self, tid):
+        """物体局部坐标 → 世界坐标的 2D 仿射矩阵 (a, b, c, d, tx, ty)：x' = a·x + b·y + tx，y' = c·x + d·y + ty。
+        逐级乘完整的 TRS 矩阵（Codex 审计 0.10.3 PT02：以前把角度相加、缩放分量相乘，父物体缩放不等比、子物体又转了的时候算错，
+        例：父缩放 (2,1)、子位置 (1,0) 转 90°、孙局部 (1,0)，以前算 (2,2)，实际是 (2,1)）。只看 z 轴旋转（2D）。"""
         if tid in self._world:
             return self._world[tid]
         t = self.tr.get(tid)
         if t is None:
-            return (0.0, 0.0, 0.0, (1.0, 1.0))
+            return (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        c, s = math.cos(math.radians(t["rot"])), math.sin(math.radians(t["rot"]))
+        sx, sy = t["scale"]
+        local = (c * sx, -s * sy, s * sx, c * sy, t["pos"][0], t["pos"][1])
         if t["father"] and t["father"] in self.tr:
-            px, py, prot, (psx, psy) = self.world(t["father"])
-            lx, ly = t["pos"][0] * psx, t["pos"][1] * psy
-            c, s = math.cos(math.radians(prot)), math.sin(math.radians(prot))
-            res = (px + c * lx - s * ly, py + s * lx + c * ly, prot + t["rot"],
-                   (psx * t["scale"][0], psy * t["scale"][1]))
+            res = _mat_mul(self.world(t["father"]), local)
         else:
-            res = (t["pos"][0], t["pos"][1], t["rot"], t["scale"])
+            res = local
         self._world[tid] = res
         return res
+
+    def world_pos(self, tid):
+        """物体原点的世界坐标。"""
+        m = self.world(tid) if tid else (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        return m[4], m[5]
 
     def path(self, goid):
         if goid in self._path:
@@ -196,9 +208,21 @@ class Scene:
         return f"{obj.type.name}:{t.get('m_Name', pid)}"
 
 
-def _zangle(q):
-    x, y, z, w = q.get("x", 0), q.get("y", 0), q.get("z", 0), q.get("w", 1)
+def _zangle(r):
+    x, y, z, w = r.get("x", 0), r.get("y", 0), r.get("z", 0), r.get("w", 1)
     return math.degrees(math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
+
+
+def _mat_mul(p, l):
+    """两个 2D 仿射矩阵相乘（先 l 后 p）。"""
+    a1, b1, c1, d1, x1, y1 = p
+    a2, b2, c2, d2, x2, y2 = l
+    return (a1 * a2 + b1 * c2, a1 * b2 + b1 * d2, c1 * a2 + d1 * c2, c1 * b2 + d1 * d2,
+            a1 * x2 + b1 * y2 + x1, c1 * x2 + d1 * y2 + y1)
+
+
+def _is_ref(x):
+    return isinstance(x, dict) and "m_PathID" in x and "m_FileID" in x
 
 
 def fsm_var(sc, v):
@@ -216,7 +240,7 @@ def fsm_var(sc, v):
         if isinstance(val, float):
             return f"{val:g}"
         if isinstance(val, str):
-            return repr(val)
+            return q(val)
         return str(val)
     return compact(sc, v)
 
@@ -237,13 +261,15 @@ def compact(sc, v, depth=0):
             parts.append(f"{k}={s}")
         return "{" + ", ".join(parts) + "}"
     if isinstance(v, list):
-        if len(v) > 12:
+        # 物体引用的数组（BattleScene 的 waves 之类，工具要逐个读）不截断（Codex 审计 0.10.3 PT05：以前 13 波截成 12 个加 …(+1)）；
+        # 只有数值之类的长数组截断，并标出还有几个。
+        if len(v) > 12 and not all(_is_ref(x) for x in v):
             return "[" + ", ".join(compact(sc, x, depth + 1) for x in v[:12]) + f", …(+{len(v) - 12})]"
         return "[" + ", ".join(compact(sc, x, depth + 1) for x in v) + "]"
     if isinstance(v, float):
         return f"{v:g}"
     if isinstance(v, str):
-        return repr(v) if v else ""
+        return q(v) if v else ""
     return str(v)
 
 
@@ -265,7 +291,7 @@ def decode_param(sc, ad, i, data_version):
                 s = ad["stringParams"][pos] if 0 <= pos < len(ad["stringParams"]) else ""
             else:
                 s = bd[pos:pos + size].decode("utf-8", "replace")
-            return ("!" if tname == "FsmEvent" else "") + repr(s)
+            return ("!" if tname == "FsmEvent" else "") + q(s)
         if tname in ("Vector2", "Vector3", "Vector4", "Rect", "Color", "Quaternion"):
             n = {"Vector2": 2, "Vector3": 3}.get(tname, 4)
             return "(" + ",".join(f"{x:g}" for x in struct.unpack_from("<" + "f" * n, bd, pos)) + ")"
@@ -315,7 +341,7 @@ def dump_fsm(sc, out, goid, fsm_tree, comp_tree):
     tmpl = comp_tree.get("fsmTemplate", {})
     tmpl_s = "" if not tmpl or tmpl.get("m_PathID", 0) == 0 else f"  template={sc.ref(tmpl)}"
     handles = [k[6:] for k, x in f.items() if k.startswith("handle") and x]
-    out.append(f"\n=== FSM {sc.path(goid)} :: {f.get('name', '')!r}  start={f.get('startState')!r}{tmpl_s}"
+    out.append(f"\n=== FSM {sc.path(goid)} :: {q(f.get('name', ''))}  start={q(f.get('startState'))}{tmpl_s}"
                f"{'  handles=' + ','.join(handles) if handles else ''}"
                f"{'' if sc.active_in_hierarchy(goid) else '  [inactive]'}{'' if comp_tree.get('m_Enabled', 1) else '  [disabled]'}")
     ev = [("*" if e.get("isGlobal") else "") + e.get("name", "") for e in f.get("events", []) if not e.get("isSystemEvent")]
@@ -378,14 +404,12 @@ def collider_points(t):
 
 
 def world_bounds(sc, trid, pts, list_max=0):
-    """局部点换到世界坐标（按 Scene.world 的位置、旋转、缩放），给出包围盒；点数不超过 list_max 时把各点也列出来。"""
-    wx, wy, rot, (sx, sy) = sc.world(trid) if trid else (0.0, 0.0, 0.0, (1.0, 1.0))
-    c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    """局部点（外形的所有角点）用 Scene.world 的矩阵换到世界坐标，给出包围盒；点数不超过 list_max 时把各点也列出来。"""
+    a, b, c, d, tx, ty = sc.world(trid) if trid else (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     xs, ys = [], []
     for px, py in pts:
-        lx, ly = px * sx, py * sy
-        xs.append(wx + c * lx - s * ly)
-        ys.append(wy + s * lx + c * ly)
+        xs.append(a * px + b * py + tx)
+        ys.append(c * px + d * py + ty)
     res = f" world x {min(xs):.1f}..{max(xs):.1f} y {min(ys):.1f}..{max(ys):.1f}"
     if len(pts) <= list_max:
         res += " [" + " ".join(f"({x:.1f},{y:.1f})" for x, y in zip(xs, ys)) + "]"
@@ -416,8 +440,11 @@ def dump(mono, bundle, out_dir):
                 elif not any(d.lower() in sname.lower() for d in DECOR):
                     body = {k: x for k, x in t.items() if k not in ("m_GameObject", "m_Script", "m_Name", "m_Enabled", "m_EditorHideFlags", "m_EditorClassIdentifier")}
                     s = compact(sc, body)
+                    # 太长的截断要标出来（wave_scan 之类的工具看到就不出草稿）；BattleScene / BattleWave 工具要读全，不截。
+                    if len(s) > 1500 and sname not in ("BattleScene", "BattleWave"):
+                        s = s[:1500] + f" …(截断 / truncated +{len(s) - 1500})"
                     if s and s != "{}":
-                        details.append(f"      {sname}{'' if t.get('m_Enabled', 1) else ' [disabled]'}: {s[:1500]}")
+                        details.append(f"      {sname}{'' if t.get('m_Enabled', 1) else ' [disabled]'}: {s}")
             elif "Collider2D" in tname:
                 t = sc.tree(cid)
                 if t.get("m_IsTrigger"):
@@ -438,7 +465,7 @@ def dump(mono, bundle, out_dir):
                                      "AudioSource", "Animator", "Rigidbody2D", "LineRenderer")]
         if not interesting and not trig:
             continue
-        wx, wy, _, _ = sc.world(g["tr"]) if g["tr"] else (0, 0, 0, 0)
+        wx, wy = sc.world_pos(g["tr"])
         act = "" if sc.active_in_hierarchy(goid) else ("  [inactive]" if g["active"] else "  [self inactive]")
         out.append(f"  {sc.path(goid)}  @({wx:.1f},{wy:.1f}){act}  {{{', '.join(comps)}}}")
         for t in trig:
@@ -460,12 +487,18 @@ def main():
     warnings.filterwarnings("ignore")
     mono, out_dir = sys.argv[1:3]
     t0 = time.time()
+    failed = []
     for b in sys.argv[3:]:
         try:
             p, n = dump(mono, b, out_dir)
             print(f"[Godhome] {os.path.basename(b)} -> {p} ({n} FSM, {time.time() - t0:.0f}s)", flush=True)
         except Exception:
+            failed.append(os.path.basename(b))
             print(f"[Godhome] {os.path.basename(b)} FAILED\n{traceback.format_exc()[-1500:]}", flush=True)
+    # 有失败的要让调用的人知道（Codex 审计 0.10.3：以前部分失败也正常退出）。
+    print(f"[Godhome] done: {len(sys.argv) - 3 - len(failed)} ok, {len(failed)} failed{': ' + ', '.join(failed) if failed else ''}", flush=True)
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -353,10 +353,24 @@ internal static class Hk1Hall
             return null;
         }
         SpriteRenderer big = srs.OrderByDescending(r => WorldBox(r).size.x * WorldBox(r).size.y).First();
+        // 所有图合起来的范围（Codex 审计 0.10.3 F09：以前 big 来自排序后的序列，Skip(1) 却跳过原列表的第一张，
+        // 第一张不是最大的时候它的范围漏掉了）。big 再包一次无害。
         Bounds box = WorldBox(big);
-        foreach (SpriteRenderer r in srs.Skip(1))
+        foreach (SpriteRenderer r in srs)
         {
             box.Encapsulate(WorldBox(r));
+        }
+        if (srs[0] != big)
+        {
+            // 记下以前的算法会得到什么，看哪尊受影响（审计说没有实际资产证据，这里留证据）。
+            Bounds old = WorldBox(big);
+            foreach (SpriteRenderer r in srs.Skip(1))
+            {
+                old.Encapsulate(WorldBox(r));
+            }
+            bool same = (old.min - box.min).sqrMagnitude < 1e-6f && (old.max - box.max).sqrMagnitude < 1e-6f;
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作雕像 {label}：最大的图不是第一张（{big.name}，第一张 {srs[0].name}），范围 / bounds {box.min.x:0.00},{box.min.y:0.00} .. {box.max.x:0.00},{box.max.y:0.00}"
+                + (same ? "，和以前一样 / same as before" : $"，以前 / was {old.min.x:0.00},{old.min.y:0.00} .. {old.max.x:0.00},{old.max.y:0.00}"));
         }
         foreach (SpriteRenderer r in srs)
         {

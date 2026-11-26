@@ -741,7 +741,7 @@ internal static class Sanctum
                     }
                     if (!BuildOk)
                     {
-                        ModeController.Instance?.ShowBanner(L.Get("ERR_NEED_RELOAD"), 8f);
+                        ModeController.Instance?.ShowNotice(L.Get("ERR_NEED_RELOAD"), 10f);
                     }
                 }
             }

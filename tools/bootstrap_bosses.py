@@ -3,12 +3,15 @@
 输入（都在 reference/extracted/，不进 git）：
   lang.json   游戏本地化表 EN/ZH（tools/dump_lang.py + lang_table.py 生成）
   scan.jsonl  场景扫描结果（tools/scan_scenes.py 生成）
-用法: python -I bootstrap_bosses.py <lang.json> <scan.jsonl> <out bosses.json>
+用法: python -I bootstrap_bosses.py <lang.json> <scan.jsonl> <out bosses.json> [--force]
+输出文件已经存在时不写（现在的 data/bosses.json 有大量手写的 arena 配置，这个初稿生成器重建不出来，
+Codex 审计 0.10.3）；真要覆盖加 --force。输出写到一个新文件再手工合并。
 
 下面 SPEC 里每条只写"人工判断"的部分：用哪个标题键/图鉴条目取官方名字、在哪个场景、Boss 物体名、
 需要的剧情标记、已知的特殊处理。场景出口、血量、地区名都从扫描数据里取，避免手抄出错。
 """
 import json
+import os
 import sys
 
 # act: 按常规流程推定的幕（阶段 1 实机核对）
@@ -168,6 +171,13 @@ VARIANTS = {
 
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
+    force = "--force" in sys.argv[1:]
+    args = [a for a in sys.argv[1:] if a != "--force"]
+    if len(args) != 3:
+        sys.exit(__doc__)
+    sys.argv[1:] = args
+    if os.path.exists(sys.argv[3]) and not force:
+        sys.exit(f"[Godhome] {sys.argv[3]} 已经存在，不覆盖（写到新文件再手工合并；真要覆盖加 --force）/ refusing to overwrite without --force")
     lang = json.load(open(sys.argv[1], encoding="utf-8"))
     scans = {}
     for line in open(sys.argv[2], encoding="utf-8"):

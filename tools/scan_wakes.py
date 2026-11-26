@@ -15,12 +15,14 @@ import re
 import sys
 from collections import Counter, defaultdict
 
-WORLD = {"Black Thread States", "Black Thread States Thread Only Variant", "Area_States"}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from dumpfmt import action_name, parse_fsm_head  # noqa: E402
+
+WORLD ={"Black Thread States", "Black Thread States Thread Only Variant", "Area_States"}
 TRIGGER_ACTIONS = ("Trigger2dEvent", "SendTrigger2DEvent", "CheckAlertRange", "CheckAlertRangeByName",
                    "CheckTrackTriggerCount", "TriggerEnterEventSubscribe")
 
 OBJ_RE = re.compile(r"^  (\S.*?)  @\(([-\d.]+),([-\d.]+)\)(.*?)\{(.*)\}\s*$")
-FSM_RE = re.compile(r"^=== FSM (.*?) :: '(.*?)'\s+start='(.*?)'(.*)$")
 
 
 def root_for(path):
@@ -38,7 +40,7 @@ def parse(path):
     cur_obj = None
     cur_fsm = None
     cur_state = None
-    for ln in lines:
+    for no, ln in enumerate(lines, 1):
         if ln.startswith("## "):
             section = "fsm" if ln.startswith("## FSM") else "obj"
             continue
@@ -52,9 +54,11 @@ def parse(path):
             elif cur_obj is not None and ln.startswith("      "):
                 cur_obj["details"].append(ln.strip())
         elif section == "fsm":
-            m = FSM_RE.match(ln)
-            if m:
-                cur_fsm = {"path": m.group(1), "name": m.group(2), "start": m.group(3), "flags": m.group(4),
+            # 标题行读不懂直接报错（dumpfmt），不当成没有这个 FSM。
+            head = parse_fsm_head(ln, f"{path}:{no}")
+            if head:
+                fpath, fname, fstart, fflags = head
+                cur_fsm = {"path": fpath, "name": fname, "start": fstart, "flags": fflags,
                            "states": {}, "globals": []}
                 fsms.append(cur_fsm)
                 cur_state = None
@@ -142,7 +146,8 @@ def main():
                 continue
             for sn, st in f["states"].items():
                 for a in st["acts"]:
-                    an = a.split("(", 1)[0].replace("(off) ", "")
+                    # 类型名要去掉 «自定义显示名»（Codex 审计 0.10.3 PT04：以前 Trigger2dEvent «Wake trigger» 认不出）。
+                    an = action_name(a)
                     if a.startswith("(off)"):
                         continue
                     if an in TRIGGER_ACTIONS and "Exit" not in a.split("trigger=", 1)[-1][:20]:
