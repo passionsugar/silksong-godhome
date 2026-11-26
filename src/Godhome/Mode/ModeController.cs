@@ -412,7 +412,7 @@ internal sealed class ModeController : MonoBehaviour
             TryAttach(gm);
             return;
         }
-        GodhomeResources.Refill(GodhomeResources.Current());
+        GodhomeResources.Tick();
 
         // 暂停菜单开着：时间停了（timeScale 0），游戏的转场协程在暂停中开始会一直卡在淡出计时上
         // （GameManager.BeginSceneTransitionRoutine 用 Time.deltaTime 数 0.34 秒）。暂停期间什么都不做，

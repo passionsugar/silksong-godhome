@@ -10,8 +10,24 @@ namespace Godhome;
 internal static class GodhomeResources
 {
     // 数值供直接读取 PlayerData 字段的条件使用；消费入口免扣，通用写入和实时兜底补给维持储备。
-    // 不用 int.MaxValue：拾取、退款、计数器的加减仍需留有充足空间。
+    // 补到游戏自己的上限（Gameplay.GetCurrencyCap，随工具袋升级变大；HUD 显示的就是满的），最多 9999：
+    // 上限没配置时游戏返回 9999999，不能照抄（审查 PR #1：原来固定 9999，可能超过上限，捡钱时 AddGeo 又会压回上限）。
     internal const int Reserve = 9999;
+
+    /// <summary>神居存档里这种货币应保持的余额。</summary>
+    internal static int Target(CurrencyType type)
+    {
+        int cap = Reserve;
+        try
+        {
+            cap = GlobalSettings.Gameplay.GetCurrencyCap(type);
+        }
+        catch (Exception)
+        {
+            // 设置还没加载（极早期）：用 9999，下一次补给再按上限来。
+        }
+        return Math.Max(1, Math.Min(cap, Reserve));
+    }
 
     /// <summary>新建/读档补满配时调用，在开战快照之前补齐；较大的现有余额不减少。</summary>
     internal static int Refill(PlayerData? pd)
@@ -21,14 +37,16 @@ internal static class GodhomeResources
             return 0;
         }
         int changed = 0;
-        if (pd!.geo < Reserve)
+        int geo = Target(CurrencyType.Money);
+        int shards = Target(CurrencyType.Shard);
+        if (pd!.geo < geo)
         {
-            pd.geo = Reserve;
+            pd.geo = geo;
             changed++;
         }
-        if (pd.ShellShards < Reserve)
+        if (pd.ShellShards < shards)
         {
-            pd.ShellShards = Reserve;
+            pd.ShellShards = shards;
             changed++;
         }
         return changed;
@@ -59,8 +77,26 @@ internal static class GodhomeResources
         {
             return;
         }
-        Refill(pd);
+        if (Refill(pd) > 0)
+        {
+            Restored++;
+        }
     }
+
+    /// <summary>ModeController 每帧调：游戏直接改字段（不走任何入口）的扣款在下一帧补回。</summary>
+    internal static void Tick()
+    {
+        if (Refill(Current()) > 0)
+        {
+            Restored++;
+        }
+    }
+
+    /// <summary>通用整数入口（IntAdd/SetInt/DecrementInt/GetInt）和每帧补给把被直接改少的余额补回去的次数（调试用）。</summary>
+    internal static int Restored { get; private set; }
+
+    /// <summary>免掉的扣款次数（调试核对念珠炮这类入口真的走到了这里）。</summary>
+    internal static int Waived { get; private set; }
 
     /// <summary>只修改正向扣款。0/负数的原始语义不变；不跳过原方法的通知、排队等工作。</summary>
     internal static void ProtectSpend(PlayerData? pd, ref int amount)
@@ -71,6 +107,7 @@ internal static class GodhomeResources
         }
         Refill(pd);
         amount = 0;
+        Waived++;
     }
 }
 
@@ -87,16 +124,23 @@ internal static class GodhomeResourceQueryPatch
     }
 }
 
-/// <summary>在排队/计数器流程前免扣，原方法照常执行；不全局跳过工具使用或货币通知。</summary>
-[HarmonyPatch(typeof(CurrencyManager), nameof(CurrencyManager.TakeCurrency),
+/// <summary>
+/// 货币队列的总入口：CurrencyManager.TakeCurrency/TakeGeo/TakeShards、HeroController.TakeCurrency/TakeGeo/TakeShards
+/// 都调 ChangeCurrency(-amount)（反编译 CurrencyManager.cs、HeroController.cs）。在这里把扣款改成 0，
+/// HUD 计数器也就不会播“-N”再跳回去（审查 PR #1：原来只拦 CurrencyManager.TakeCurrency，主角那条路的计数器照样减）。
+/// 加钱（正数）不动；原方法照常执行。
+/// </summary>
+[HarmonyPatch(typeof(CurrencyManager), nameof(CurrencyManager.ChangeCurrency),
     new[] { typeof(int), typeof(CurrencyType), typeof(bool) })]
 internal static class GodhomeResourceSpendPatch
 {
     private static void Prefix(CurrencyType type, ref int amount)
     {
-        if (GodhomeResources.IsSupplied(type))
+        if (amount < 0 && GodhomeResources.IsSupplied(type))
         {
-            GodhomeResources.ProtectSpend(GodhomeResources.Current(), ref amount);
+            int spend = -amount;
+            GodhomeResources.ProtectSpend(GodhomeResources.Current(), ref spend);
+            amount = -spend;
         }
     }
 }

@@ -835,12 +835,12 @@ internal static class Arena
         }
         if (e.Terminal)
         {
-            // 仅数据显式选择的结局状态终止原剧情：丝母 Death Hit 后面的原动作可能继续接管角色物理。
+            // 数据里标了 terminal 的结局状态（丝母 Death Hit）：判胜插最前面，原动作照样执行（停攻击、放开被抓的主角、Boss 无敌），
+            // 去掉出口，原版结局演出（会把主角刚体设成运动学）就不会开始。说明见 TerminalEndGGBossScene。
             // InitData 后修改的是这个场景的 FSM 实例；未醒的模板上面已拒绝，不能改模板资产。
-            // 即使最前面已经有普通 End，也必须替换；不能走下面的“已经有了”早退。
+            // 全局跳转此时仍供战斗阶段使用，到 terminal.OnEnter 才清掉；不能 Stop/Disable 整个 FSM 或 Boss。
             TerminalEndGGBossScene.Install(st);
-            // 全局事件此时仍供战斗阶段使用，到 terminal.OnEnter 才清掉；不能 Stop/Disable 整个 FSM 或 Boss。
-            result = "ok (terminal: ending actions and outgoing transitions sealed)";
+            result = $"ok (terminal: {st.Actions.Length - 1} original actions kept, no exits)";
             return true;
         }
         // 只认排在最前面、启用的（Codex 审查 0.9.0 #11）：排在后面的可能在它之前就被别的动作跳走，停用的不执行。
@@ -1195,8 +1195,10 @@ internal static class Arena
             }
             if (!found)
             {
-                MarkFatal(serial, $"双苔母安全落点 / Weavenest pair entry: {detail}");
-                return false;
+                // 表里的门（0.10.5 改到场内地面 (4.3, 21.6)，实机落在 (4.3, 20.6)）本身就是场内落点；校验找不到
+                // “完全干净”的位置（比如开场时小飞虫正好贴着人）不该把整场判成场地故障，只记下来，人留在门前。
+                GodhomePlugin.Log.LogWarning($"[Godhome] 双苔母落点校验没通过，留在表里的门前 / Weavenest pair entry not verified, staying at the configured door {Fmt(hero.transform.position)}: {detail}");
+                return true;
             }
             Vector3 was = hero.transform.position;
             if (Vector2.SqrMagnitude((Vector2)was - target) > 0.0001f)
@@ -1226,11 +1228,8 @@ internal static class Arena
         }
         catch (Exception ex)
         {
-            if (same())
-            {
-                MarkFatal(serial, $"双苔母安全落点检查出错 / Weavenest pair entry check failed: {Bad(ex.Message)}");
-            }
-            return false;
+            GodhomePlugin.Log.LogWarning($"[Godhome] 双苔母落点校验出错，留在表里的门前 / Weavenest pair entry check failed, staying at the configured door: {Bad(ex.Message)}");
+            return same();
         }
     }
 
