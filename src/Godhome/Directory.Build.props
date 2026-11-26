@@ -11,6 +11,7 @@
     It should follow the format major.minor.patch (semantic versioning). If you publish your mod
     as a library to NuGet, this version will also be used as the package version.
     -->
-    <Version>0.10.4</Version>
+    <!-- Local 0.10.5 hotfix candidate based on upstream 0.10.4; not an upstream release. -->
+    <Version>0.10.5</Version>
   </PropertyGroup>
 </Project>

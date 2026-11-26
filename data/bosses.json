@@ -1984,7 +1984,8 @@
           {
             "path": "Boss Scene/Silk Boss",
             "fsm": "Phase Control",
-            "state": "Death Hit"
+            "state": "Death Hit",
+            "terminal": true
           }
         ],
         "keep": [

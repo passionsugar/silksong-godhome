@@ -96,6 +96,7 @@ internal sealed class ModeController : MonoBehaviour
     internal int SaveCount { get; private set; }
 
     private readonly List<HealthManager> bossHms = new();
+    private readonly HeroRecovery heroRecovery = new();
     private bool ourTransition;
 
     /// <summary>暂停中要发起的场景切换，继续游戏后再切。记下当时的状态和场次，变了就作废。</summary>
@@ -165,6 +166,7 @@ internal sealed class ModeController : MonoBehaviour
 
     private void OnDestroy()
     {
+        heroRecovery.Clear();
         SceneManager.sceneLoaded -= OnUnitySceneLoaded;
         SceneManager.sceneUnloaded -= OnUnitySceneUnloaded;
     }
@@ -410,6 +412,7 @@ internal sealed class ModeController : MonoBehaviour
             TryAttach(gm);
             return;
         }
+        GodhomeResources.Refill(GodhomeResources.Current());
 
         // 暂停菜单开着：时间停了（timeScale 0），游戏的转场协程在暂停中开始会一直卡在淡出计时上
         // （GameManager.BeginSceneTransitionRoutine 用 Time.deltaTime 数 0.34 秒）。暂停期间什么都不做，
@@ -452,6 +455,11 @@ internal sealed class ModeController : MonoBehaviour
                 GodhomePlugin.Log.LogInfo($"[Godhome] 继续游戏，开始切场景 / resumed, changing scene now → {pScene}@{pGate}");
                 Transition(pScene, pGate, pRespawning);
             }
+        }
+
+        if (State == LoomState.Lobby)
+        {
+            heroRecovery.CheckLobby(gm, fightSerial);
         }
 
         if (GodhomeConfig.LoomKey.Value.IsDown())
@@ -615,12 +623,14 @@ internal sealed class ModeController : MonoBehaviour
         LastResult = FightResult.None;
         string scene = gm.GetSceneNameString();
         Hk1Lobby.Decide();
+        bool repairedCutsceneData = HeroRecovery.NormalizeLoadedData(gm);
         GodhomePlugin.Log.LogInfo($"[Godhome] 接管神居存档 / attached to godhome save (slot {gm.profileID}, scene {scene}{(justCreated ? ", new" : "")}{(Hk1Lobby.Active ? ", hk1 godhome" : "")})");
         if (Lobby.Is(scene))
         {
             SetState(LoomState.Lobby);
             SetDeathRespawnToLobby();
             Heal();
+            heroRecovery.ArmLobby(gm, fightSerial);
             if (Hk1Lobby.Active)
             {
                 OnHk1Arrive(scene);
@@ -632,9 +642,9 @@ internal sealed class ModeController : MonoBehaviour
             ShowBanner(L.F("BANNER_LOBBY", L.Get("LOOM_NAME"), GodhomeConfig.LoomKey.Value), 5f);
             // 新建的神居存档马上存一次（游戏的神居分支不播开场、也不存档，不存的话关游戏后槽还是空的）；
             // 补了满配也存一次。这时没有快照，写的是大厅的实时数据。
-            if (justCreated || kitChanges > 0)
+            if (justCreated || kitChanges > 0 || repairedCutsceneData)
             {
-                SaveNow(justCreated ? "new godhome save / 新建神居存档" : "kit / 补满配");
+                SaveNow(justCreated ? "new godhome save / 新建神居存档" : repairedCutsceneData ? "repaired cutscene state / 修复演出标记" : "kit / 补满配");
             }
         }
         else
@@ -696,6 +706,7 @@ internal sealed class ModeController : MonoBehaviour
                 GodhomePlugin.Log.LogError($"[Godhome] 模式重置时这一步出错 / mode reset step failed ({what}): {e}");
             }
         }
+        Step("hero recovery", heroRecovery.Clear);
         Step("snapshot", SaveGuard.Clear);
         // 万神殿连战作废（回标题、换存档：这次不记录），束缚解开，结算不再弹。
         Step("damage hook", UnhookDamage);
@@ -830,6 +841,7 @@ internal sealed class ModeController : MonoBehaviour
             {
                 RunGear.Refresh("back to the lobby / 回大厅，配装回到开殿前");
             }
+            heroRecovery.LeaveFight(GameManager.instance, fightSerial, why);
         }
         catch (Exception e)
         {
@@ -929,6 +941,7 @@ internal sealed class ModeController : MonoBehaviour
         Arena.Clear();
         SetDeathRespawnToLobby();
         Heal();
+        heroRecovery.ArmLobby(GameManager.instance, fightSerial);
         // 兜底：战斗中放弃、Boss 演出收着 HUD 时被改道回来、判胜后死了，到了大厅 HUD 还收着就叫回来（大厅里没有该藏 HUD 的演出）。
         // 放在回满血之后：RestoreHud 见没血就当人在死，不叫。
         RestoreHud("arrived / 到达大厅");
@@ -1094,6 +1107,7 @@ internal sealed class ModeController : MonoBehaviour
         }
         // 挑战面板开着（自检、调试键直接开战）：先关掉并交还暂停和交互，快照里不能带着面板的 disablePause（Codex 审查 v0.5.0 #2）。
         LoomUI.Instance?.AbortChallenge("fight starting");
+        HeroRecovery.NormalizeLoadedData(GameManager.instance);
         try
         {
             // 给大厅的状态拍快照：战斗中存档写它，回大厅时拷回来。失败时还什么都没改，留在大厅（Codex 审查 #5）。
@@ -1121,6 +1135,7 @@ internal sealed class ModeController : MonoBehaviour
     {
         CurrentBoss = b;
         fightSerial++;
+        heroRecovery.BeginFight(GameManager.instance, fightSerial);
         LastResult = FightResult.None;
         bossHms.Clear();
         ignoredHms.Clear();
@@ -1207,6 +1222,7 @@ internal sealed class ModeController : MonoBehaviour
             return;
         }
         LoomUI.Instance?.AbortChallenge("pantheon starting");
+        HeroRecovery.NormalizeLoadedData(GameManager.instance);
         try
         {
             SaveGuard.Take(GameManager.instance);
@@ -1301,6 +1317,9 @@ internal sealed class ModeController : MonoBehaviour
         {
             RunGear.Refresh("pantheon next / 万神殿下一场");
         }
+        // 仍在旧场景、仍是旧场次：下一场 BeginBoss 会换编号并登记新的角色所有权。
+        // 不能挪到新场景 FinishedEnteringScene 后，那时新 Boss 的开场可能已经拿走控制。
+        heroRecovery.LeaveFight(GameManager.instance, fightSerial, "pantheon next / 万神殿下一场");
         // 血、丝、蓝血和换场前一样（HUD 显示的就是这些），不用刷新 HUD。
         // 去休息点的话会在长椅回满，不用再带。
         run.Carry = rest ? null : (pd.health, pd.silk, pd.healthBlue);
@@ -2301,6 +2320,7 @@ internal sealed class ModeController : MonoBehaviour
                 // 重新进一次：这一场的场地状态清零（新加载的场景重新准备）。换一个场次号（Codex 审查 0.9.0 #5）：
                 // 上一次加载建的控制器、开战标记、延后步骤拿的是旧号，都不再认。
                 fightSerial++;
+                heroRecovery.BeginFight(gm, fightSerial);
                 Arena.Begin(CurrentBoss, CurrentTier, fightSerial, OnArenaBossesDead, OnArenaComplete);
                 Transition(CurrentBoss.EntryScene, Arena.EnterGate, respawning: false);
                 break;
@@ -2320,6 +2340,10 @@ internal sealed class ModeController : MonoBehaviour
     private void SetState(LoomState s)
     {
         LoomState was = State;
+        if (s != LoomState.Lobby)
+        {
+            heroRecovery.CancelLobby();
+        }
         if (State != s)
         {
             GodhomePlugin.Log.LogInfo($"[Godhome] 状态 / state {State} → {s}");

@@ -11,7 +11,7 @@
 | 判胜靠击败标记 / 图鉴 / 血量归零后等宽限期 | 游戏自己的 `BossSceneController`：Boss 的 `HealthManager.OnDeath` 都到了（`bosses`），或者特殊 Boss 在表里指定的状态里插 `EndGGBossScene` |
 | 重织 / 断丝：单独挂一个不激活的 `BossSceneController` | 场地控制器上的 `BossSceneController.BossLevel` |
 | 回大厅从长廊入口 `right1` 进来，黑幕下再把人挪到雕像 / 门前（`PlaceAtStatue`） | `door_dreamReturn` + `playerData.bossReturnEntryGate`，游戏自己把人放在雕像 / 门前的回程门 |
-| 运行时自动猜（找触发区、找落点、按距离挑） | 不猜。表里没写的 Boss 不能开战（日志报错）。自动分析只在离线脚本里，用来生成草稿 |
+| 运行时自动猜（找触发区、找落点、按距离挑） | 没配置的 Boss 不能开战。通用场地分析只在离线脚本里生成草稿；双苔母另有仅检查已配置 BattleScene 的一次入场安全校验（见 1.3） |
 
 ## 1. 流程
 
@@ -54,6 +54,10 @@
 - `dontWalkOutOfDoor = true`：站在门口，不播“从门里走出来”。`alwaysEnterRight` / `alwaysEnterLeft` 按表里的朝向。
 - 子物体 `HazardRespawnMarker`：危险复活点（掉进尖刺、酸池后回到门口）。
 - 位置 = 表里的 `arena.door`。门型入口只用 x 和“往下找地面”（`FindGroundPoint`），所以 y 写在地面上方一点就行；不能写在墙里。
+
+#### 双苔母的入场安全校验（0.10.5 本地修复候选）
+
+`moss_mother_duo` / `Weave_03` 额外验证实际角色落点。`GetEntryGateName` 只能说明入口名正确，不能说明身体没有卡墙、落在战斗范围内。保留表中门坐标作为锚点，在角色就位后的物理帧、补发开战触发之前，按配置的 `Boss Scene` / `BattleScene` 校验完整角色体积、实心障碍和本场景地面。无效时只在这个明确战斗区域内有限搜索并修正一次，同时更新入口及危险复活点；无法确认安全位置则报告场地故障并回大厅。其他 Boss 不启用这条逻辑，不在战斗中持续追踪或传送玩家。该修复仍需用真实 `Weave_03` 场景验证，参考程序集不含场景几何。
 
 ### 1.4 出口（对应前作 `GG_Arena_Prefab` 的墙）
 
@@ -125,6 +129,7 @@
                                             // 跳过的 Boss 前小怪波次（BattleWave 物体路径），见 1.8
   "end": [ { "path": "Boss Scene/Phantom", "fsm": "Control", "state": "Death Start" } ],
                                             // 特殊结局：在这些状态最前面插 EndGGBossScene。写了 end 就不用 bosses 判胜
+                                            // 可选 terminal: true：此处判胜后截断原版结局，只用于确认会进入结局的终点
   "enter": [ { "type": "register", "event": "GONG HIT", "delay": 0.5 } ],
                                             // 进场后（人站好、能操作时）按顺序执行，相当于前作 Dream Entry 的最后几步。
                                             // 能用 patch 做的不写在这里
@@ -135,6 +140,7 @@
 }
 ```
 
+- `end[].terminal`（0.10.5 本地修复候选）：默认 `false`，保留旧的“前插判胜动作”行为。仅丝母 `Boss Scene/Silk Boss` / `Phase Control` / `Death Hit` 设为 `true`：该死亡状态只执行神居结束动作、清除本状态后续跳转；真正进入死亡状态时才清除这个 FSM 的全局跳转，战斗前段不受影响。不能在安装补丁时就清空全局事件，也不能禁用 FSM / BossSceneController 来截断结局，否则可能破坏战斗或结束协程。非布尔值（包括 `"true"` 字符串）视为判胜配置错误，该 Boss 禁止开战。只适用于明确的最终结局状态，不能用于换阶段或还需要完成正常死亡清理的其他 Boss。
 - `required`（0.10.4，Codex 审计 0.10.3）：`patch` 和 `enter` 的每一项都可以写 `"required": true`，表示这一步不成功这场就打不了。
   `patch` 里的必需项：这一场的场景都来了（或者等附加场景到头了）还没打上，就按“场地出错”回大厅（`Arena.Unwinnable`），屏幕上提示、不记尝试；
   `enter` 里的必需项：`when` 等不到、或者这一步执行失败，同样按场地出错处理（`Arena.MarkFatal`），后面的进场步骤不再执行。

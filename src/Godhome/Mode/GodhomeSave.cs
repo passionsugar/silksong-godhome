@@ -181,6 +181,9 @@ internal static class GodhomeSave
             pd.AddToMaxHealth(kitMaxHealthBase - pd.maxHealthBase);
             changed++;
         }
+        // 神居里没有正常的货币掉落，但念珠炮和建筑师仍用念珠/工具碎片作为资源。
+        // 在开战快照之前补足真实余额；运行时消费由 GodhomeResources 免扣，普通档不改。
+        changed += GodhomeResources.Refill(pd);
         return changed;
     }
 
