@@ -104,7 +104,7 @@ internal static class GodhomeSave
     }
 
     /// <summary>
-    /// 每次进入神居存档补一遍满配：数值字段、全部工具、全部纹章。已经有的不变，不弹获得提示。
+    /// 每次进入神居存档补一遍满配：数值字段、全部工具、全部纹章和纹章上锁着的槽。已经有的不变，不弹获得提示。
     /// 解锁时游戏会排成就，神居存档里都被拦下（AchievementGate）。
     /// </summary>
     /// <returns>改了多少项（0 = 本来就是满配）。</returns>
@@ -120,19 +120,15 @@ internal static class GodhomeSave
         loadChanges = 0;
         int tools = kitTools ? UnlockTools() : 0;
         int crests = kitCrests ? UnlockCrests() : 0;
-        GodhomePlugin.Log.LogInfo($"[Godhome] 满配 / kit applied: {fields} 个字段, 新解锁工具 / tools {tools}, 新解锁纹章 / crests {crests}");
-        return fields + tools + crests;
+        int slots = kitCrests ? UnlockCrestSlots() : 0;
+        GodhomePlugin.Log.LogInfo($"[Godhome] 满配 / kit applied: {fields} 个字段, 新解锁工具 / tools {tools}, 新解锁纹章 / crests {crests}, 新开的纹章槽 / crest slots {slots}");
+        return fields + tools + crests + slots;
     }
 
     /// <summary>读档时（ApplyFieldsOnLoad）写进去的是哪份数据、改了几项：接管时 ApplyKit 算进去。</summary>
     private static PlayerData? loadApplied;
     private static int loadChanges;
 
-    /// <summary>
-    /// 读进神居存档时（标题画面，SetLoadedGameData 之后，见 NewGamePatches.cs 的 GodhomeLoadPatch）先写满配的数值字段。
-    /// 主要是 bindCutscenePlayed：HUD 要它为真才画血、丝轴（以前的神居存档里是假，进游戏前不补上 HUD 就一直不出来）。
-    /// 工具、纹章照旧进游戏后（ApplyKit）再解锁。
-    /// </summary>
     /// <summary>读进的不是神居存档：丢掉上一份神居存档读档时的记录（没走到接管就回标题时，它还拿着那份数据）。</summary>
     internal static void ForgetLoad()
     {
@@ -140,6 +136,11 @@ internal static class GodhomeSave
         loadChanges = 0;
     }
 
+    /// <summary>
+    /// 读进神居存档时（标题画面，SetLoadedGameData 之后，见 NewGamePatches.cs 的 GodhomeLoadPatch）先写满配的数值字段。
+    /// 主要是 bindCutscenePlayed：HUD 要它为真才画血、丝轴（以前的神居存档里是假，进游戏前不补上 HUD 就一直不出来）。
+    /// 工具、纹章照旧进游戏后（ApplyKit）再解锁。
+    /// </summary>
     internal static void ApplyFieldsOnLoad(PlayerData pd)
     {
         bool hudWaiting = !pd.bindCutscenePlayed;
@@ -254,6 +255,71 @@ internal static class GodhomeSave
         if (unlocked.Count > 0)
         {
             GodhomePlugin.Log.LogInfo($"[Godhome]   新解锁纹章 / crests unlocked: {string.Join(", ", unlocked)}");
+        }
+        return n;
+    }
+
+    /// <summary>
+    /// 纹章上锁着的槽全部打开（玩家反馈“纹章的槽开不了”）。
+    /// 槽锁没锁看存档里这个纹章的 Slots[i].IsUnlocked（反编译 InventoryToolCrestSlot.IsLocked）。
+    /// 解锁纹章（ToolCrest.Unlock）只给不锁的槽设 true；锁着的（SlotInfo.IsLocked）要在长椅上用“记忆挂坠盒”一个个开
+    /// （InventoryToolCrestSlot.UnlockHoldRoutine），神居存档里没有挂坠盒。已经装在槽里的工具不动。
+    /// </summary>
+    private static int UnlockCrestSlots()
+    {
+        int n = 0;
+        var opened = new List<string>();
+        try
+        {
+            foreach (ToolCrest c in ToolItemManager.GetAllCrests().Where(c => c != null && !c.IsHidden && c.IsUnlocked))
+            {
+                ToolCrest.SlotInfo[] infos = c.Slots ?? Array.Empty<ToolCrest.SlotInfo>();
+                if (infos.Length == 0)
+                {
+                    continue;
+                }
+                ToolCrestsData.Data data = c.SaveData;
+                List<ToolCrestsData.SlotData> list = data.Slots ?? new List<ToolCrestsData.SlotData>();
+                bool changed = data.Slots == null;
+                int k = 0;
+                for (int i = 0; i < infos.Length; i++)
+                {
+                    if (i >= list.Count)
+                    {
+                        // 存档里少了的槽补上（开着的）。
+                        list.Add(new ToolCrestsData.SlotData { IsUnlocked = true });
+                        changed = true;
+                        k += infos[i].IsLocked ? 1 : 0;
+                        continue;
+                    }
+                    if (!list[i].IsUnlocked)
+                    {
+                        ToolCrestsData.SlotData s = list[i];
+                        s.IsUnlocked = true;
+                        list[i] = s;
+                        changed = true;
+                        k++;
+                    }
+                }
+                if (changed)
+                {
+                    data.Slots = list;
+                    c.SaveData = data;
+                }
+                if (k > 0)
+                {
+                    n += k;
+                    opened.Add($"{c.name}×{k}");
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            GodhomePlugin.Log.LogError($"[Godhome] 开纹章槽出错 / unlocking crest slots failed: {e}");
+        }
+        if (opened.Count > 0)
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome]   新开的纹章槽 / crest slots unlocked: {string.Join(", ", opened)}");
         }
         return n;
     }

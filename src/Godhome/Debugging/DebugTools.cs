@@ -111,6 +111,9 @@ internal sealed partial class DebugTools : MonoBehaviour
     /// <summary>自检每一步都要满足：调试开着、当前槽在 Safety.EnabledSlots 里。中途有一项不满足就中止。</summary>
     private static bool Allowed() => DebugOn && SlotOk;
 
+    /// <summary>调试开着、当前存档槽允许调试（给别的调试工具用，如进场检查 ArrivalWatch）。</summary>
+    internal static bool DebugAllowed => Allowed();
+
     private static bool SlotOk
     {
         get
@@ -1454,6 +1457,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         SelfTestStatus = abort == null ? "完成 / done" : "中止 / aborted";
         // 和报告用同一个判定（Codex 审查 #29）。
         GodhomePlugin.Log.LogInfo($"[Godhome] 自检结束 / self-test finished: {rows.Count(Passed)}/{rows.Count} 全部通过（计划 / planned {planned}）{(abort != null ? $"，中止 / aborted: {abort}" : "")}");
+        ArrivalWatch.Summary();
         bool quit = abort == null && rows.Count == planned && GodhomeConfig.DebugQuitAfterSelfTest.Value;
         SelfTestRunning = false;
         selfTestRoutine = null;
@@ -2099,6 +2103,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         WriteReport(final: true, abort: abort);
         SelfTestStatus = abort == null && checksOk ? "完成 / done" : "中止或有失败 / aborted or failed";
         GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿自检结束 / pantheon self-test finished: 场次 / fights {rows.Count(Passed)}/{rows.Count}，检查 / checks {extra.Count(l => l.StartsWith("PASS", StringComparison.Ordinal))}/{extra.Count}{(abort != null ? $"，中止 / aborted: {abort}" : "")}");
+        ArrivalWatch.Summary();
         bool quit = abort == null && GodhomeConfig.DebugQuitAfterSelfTest.Value;
         SelfTestRunning = false;
         Hk1Battle.SetShotDir(null);

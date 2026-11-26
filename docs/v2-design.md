@@ -53,6 +53,7 @@
 | 移动和战斗能力 | `hasDash`、`hasWalljump`、`hasDoubleJump`、`hasBrolly`、`hasHarpoonDash`、`hasSuperJump`、`hasChargeSlash`、`hasNeedolin`、`hasNeedolinMemoryPowerup`、`hasSilkSpecial`、`hasParry` 等 | PlayerData.cs:226-269 |
 | 数值 | 面具 `maxHealthBase`、灵丝 `silkMax`、丝之心 `silkRegenMax`、织针 `nailUpgrades`、工具袋 `ToolPouchUpgrades` / `ToolKitUpgrades` | PlayerData.cs:132-226、2762-2764 |
 | HUD 出现 | `bindCutscenePlayed`（2026-11-26 加）：HUD 的面具、灵丝轴、缚丝球、工具图标的 FSM 都要它为真才出现，为假时一直等开场的缚丝演出。神居存档不播开场，不补上左上角什么都不画 | PlayerData.cs:957；HUD 的 `health_display` / `Animate` / `Display` / `Icons Scale In` |
+| 纹章上锁着的槽 | 接管时 `GodhomeSave.UnlockCrestSlots`（2026-11-26 加）：每个已解锁纹章的存档槽（`ToolCrestsData.Data.Slots`）补齐、全部设成已解锁，装着的工具不动。`UnlockAllCrests` 只开 `SlotInfo.IsLocked` 为假的槽，原版要记忆挂坠盒才开的那些一直锁着（0.10.1 玩家反馈“纹章的槽开不了”） | ToolCrest.cs 的 `Unlock`、`SlotInfo.IsLocked` |
 
 数值字段新建时就写进去；以前建的神居存档每次读档时（`GameManager.SetLoadedGameData` 的后缀，还在标题画面、HUD 没初始化）先写一遍，进游戏后接管时再补工具、纹章。
 
@@ -90,6 +91,13 @@
 - 每场战斗开打前，按 Boss 表里的 `prerequisites` 临时设好条件，比如“某个剧情做到哪了”、`blackThreadWorld`。
 - 开打时跳过开场对话：开战前设好“见过”标记走重打分支，需要的再加加载时补丁（`arena.encountered`、`arena.patch`）。
 - 打完用第一版已经验证过的快照还原。神居存档里的世界状态永远不变，战绩另外记。
+- 打完不弹获得提示（2026-11-26 加，0.10.1 玩家反馈打完幽影弹“获得十字绣”）：神居模式里技能（`SkillGetMsg`）、能力（`PowerUpGetMsg`）、纹章（`ToolCrestUIMsg`）、
+  物品（`CreateUIMsgGetItem`）的获得提示都不弹（`Patches/RewardMsgPatches.cs`），下一帧照提示关掉时那样调回调、补发事件（例如幽影的 `SKILL GET MSG FADED OUT` / `ENDED`）。
+  满配已经都有了，快照还原后这些奖励本来也不会留下。
+- 战斗中 HUD 收着就叫回来（2026-11-26 加，0.10.1 玩家反馈原初罪者整场没血条）：开战以后 HUD 收着、人又能操作（没交出控制、没死），连续 2 秒就叫回来（`ModeController.CheckFightHud`）。
+  跳过开场时可能跳过了原版叫回 HUD 的那一步（原初罪者的神龛在 Look Back 收了 HUD，后面没有地方再叫）。开场演出、对话会收回控制，不受影响。
+- 切磋战（沙克拉、加蒙德、针姬）跳过对话时，要让对话 NPC 的 FSM 走到原版“答应切磋以后”的状态，不能只给 Boss 发开打的事件（2026-11-26，0.10.1 玩家反馈“中途变回对话模式”、针姬隐身）：
+  对话 FSM 停在等对话的状态会一直开着交互提示、NPC 的看人动画，还会对唱歌、噪音做反应（对 Boss 播 NPC 的动画）；有的 Boss 本体渲染要靠 NPC 醒来的那一步打开。每场的做法写在 `data/bosses.json` 的 `arena.$comment` 里。
 - 第一版的“只列出打过的 Boss”这道护栏，在神居存档里不存在：雕像全部可以挑战。
 
 ### 黑线和变体（拉杆）

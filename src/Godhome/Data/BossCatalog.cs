@@ -163,6 +163,12 @@ internal sealed class ArenaDef
     public string[] NoAdditive = Array.Empty<string>();
 
     /// <summary>
+    /// 开战后 HUD 收着、人能操作，过多少秒叫回来（ModeController.CheckFightHud，默认 2 秒）。
+    /// 开场演出本来就收着 HUD、演完自己会叫回来、又没收人控制的写长一点（崇高圣母灵丝：挑战以后到 Begin 约 20 秒）。
+    /// </summary>
+    public float HudGrace = 2f;
+
+    /// <summary>
     /// 判胜相关的配置写错了（arena.end 不是数组、有一项缺 path / state）：不为空就不能开战（Codex 审查 0.9.0 #12）。
     /// 跳过写错的那项会悄悄改成按 bosses 判胜，特殊死亡的 Boss 就赢不了。
     /// </summary>
@@ -355,7 +361,7 @@ internal static class BossCatalog
         "entry", "bossObjects", "hp", "flags", "prerequisites", "allowScenes", "journal", "statueArt", "arena", "debug", "notes",
     };
     private static readonly HashSet<string> EntryKeys = new() { "scene" };
-    private static readonly HashSet<string> ArenaKeys = new() { "$comment", "door", "face", "wake", "encountered", "patch", "skipWaves", "end", "enter", "keep", "challenge", "noAdditive" };
+    private static readonly HashSet<string> ArenaKeys = new() { "$comment", "door", "face", "wake", "encountered", "patch", "skipWaves", "end", "enter", "keep", "challenge", "noAdditive", "hudGrace" };
     private static readonly HashSet<string> DebugKeys = new() { "$comment", "kill", "timeout", "killInterval", "killAdds", "react", "holdKill" };
 
     private static void Unknown(JObject? o, HashSet<string> known, string id, string prefix)
@@ -491,6 +497,11 @@ internal static class BossCatalog
         a.SkipWaves = Strings(arena["skipWaves"]);
         a.Challenge = Bool(arena, "challenge");
         a.NoAdditive = Strings(arena["noAdditive"]);
+        if (arena["hudGrace"] is JToken hg && Num(hg) == null)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] {id}: arena.hudGrace 要写秒数，按默认 2 秒 / arena.hudGrace must be a number of seconds; using the default (2): {hg.ToString(Newtonsoft.Json.Formatting.None)}");
+        }
+        a.HudGrace = Clamp(Num(arena["hudGrace"]), 0.5f, 120f, 2f);
         return a;
     }
 

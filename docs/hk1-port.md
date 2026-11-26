@@ -226,6 +226,11 @@
   - 只在这个前作房间是这次切场景的目的地（`GameManager.nextSceneName`）时换：音频是全局的，调试实验附加加载的前作房间不能停掉当前场景的环境音。
   - 同名快照找不到时设成空（场景管理器 `Start` 对每个快照都判空，跳过）。实测用到的四个房间音乐快照都找到了。
 - **界面上的“!!CP3/…!!”**：前作的文本表丝之歌里没有，换成我们的文字（`Hk1Text`）。
+- **坐长椅每次弹前作的护符提示**（2026-11-26，0.10.1 玩家反馈：弹小骑士打开背包换护符的提示，文字是没本地化的键）：
+  - 原因：前作长椅的 `Bench Control` 坐下后进 `Charm Prompt?`，用 `PlayerDataBoolTest` 判前作的 `hasCharm`、`charmBenchMsg`，没护符或提示过就发 SKIP。
+    丝之歌的 PlayerData 没有这两个字段，`PlayerDataBoolTest` 找不到字段时什么事件都不发，状态走默认的那条路，每次都生成前作的护符提示。
+  - 修法：`Hk1Lobby.FixFsm` 在这个状态最前面加 `Hk1SendEvent`（结束本步、发 SKIP），后面的动作不再执行（PlayMaker 在 `IsSwitchingState` 时停止执行剩下的动作）。
+  - 实测：第五万神殿自检三个休息点的长椅都直接 SKIP，不弹提示。
 - **苔藓之母黑屏**（初遇 `Tut_03`、织巢双生 `Weave_03`；和前作神居无关，以前也黑）：场地东边的 `Moss Vine Cluster` 后面那片有遮罩（`Mask`，Over 层的黑块），
   要砍断藤蔓（FSM `Control` 打 4 下 → `End` 把遮罩淡掉）才揭开；原作里玩家砍开藤蔓才进得了这个场地。表里加补丁，藤蔓的 FSM 从 `Activated` 开始（等于砍过）。
   排查用的诊断留在自检里：每场记暗度、挖光的图、盖住人的物体、场景遮罩的组件和 FSM 状态（`Debugging/ViewInfo.cs`）。

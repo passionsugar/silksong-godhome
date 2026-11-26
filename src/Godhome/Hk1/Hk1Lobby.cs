@@ -388,7 +388,7 @@ internal static class Hk1Lobby
     }
 
     /// <summary>
-    /// 前作 FSM 里丝之歌接不上的两处：
+    /// 前作 FSM 里丝之歌接不上的几处（3、4 见函数里的注释：回程门的淡入、长椅的护符提示）：
     /// 1. 交互 FSM（npc_control、inspect_region）在“Can Talk?”里调 HeroController.CanTalk，丝之歌没有这个方法
     ///    （反编译 HeroController.cs 核实）。换成丝之歌的 CanInteract（我们的界面开着时也不行）。
     /// 2. ShowPromptMarker 生成前作的上键提示（Arrow Prompt New），丝之歌的 PromptMarker 要的 NestedFadeGroup 它没有，
@@ -412,6 +412,15 @@ internal static class Hk1Lobby
         if (fadeState != null && f.GetState(fadeState) is FsmState fadeIn && !fadeIn.Actions.Any(a => a is Hk1FadeSceneIn))
         {
             fadeIn.Actions = new FsmStateAction[] { new Hk1FadeSceneIn() }.Concat(fadeIn.Actions).ToArray();
+            changed = true;
+        }
+        // 4. 前作长椅（Bench Control）坐下后的“Charm Prompt?”：前作是没护符（hasCharm 假）或提示过（charmBenchMsg 真）就 SKIP，
+        //    否则生成前作的护符装备提示（Charm Equip Msg：小骑士打开物品栏换护符，文字是前作的键）。丝之歌的 PlayerData 没有这两个字段，
+        //    丝之歌的 PlayerDataBoolTest 查不到字段时一个事件都不发（反编译 PlayerDataBoolTest.OnEnter），于是每次坐下都弹（玩家反馈）。
+        //    在这个状态最前面直接发 SKIP，和前作没护符时一样（发了事件，后面的动作就不跑：FsmState.ActivateActions）。
+        if (pm.FsmName == "Bench Control" && f.GetState("Charm Prompt?") is FsmState charm && !charm.Actions.Any(a => a is Hk1SendEvent))
+        {
+            charm.Actions = new FsmStateAction[] { new Hk1SendEvent { EventName = "SKIP" } }.Concat(charm.Actions).ToArray();
             changed = true;
         }
         foreach (FsmState st in f.States)
@@ -526,6 +535,19 @@ internal static class Hk1Lobby
         {
             GodhomePlugin.Log.LogWarning($"[Godhome] 记镜头出错 / camera log failed: {e.Message}");
         }
+    }
+}
+
+/// <summary>[Godhome] 进状态就发一个事件（这个状态后面的动作不再跑）。前作 FSM 里丝之歌判不了的分支用它直接走。</summary>
+internal sealed class Hk1SendEvent : FsmStateAction
+{
+    public string EventName = "";
+
+    public override void OnEnter()
+    {
+        GodhomePlugin.Log.LogInfo($"[Godhome] 前作 FSM 直接走 / hk1 fsm shortcut: {Owner?.name}|{Fsm?.Name} [{State?.Name}] → {EventName}");
+        Finish();
+        Fsm?.Event(FsmEvent.GetFsmEvent(EventName));
     }
 }
 

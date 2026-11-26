@@ -63,7 +63,7 @@ public partial class GodhomePlugin : BaseUnityPlugin, ISaveDataMod<GodhomeSaveDa
     /// 游戏更新后这些目标变了也不会连累别的补丁。</summary>
     private static readonly HashSet<string> DebugOnlyPatches = new(StringComparer.Ordinal)
     {
-        nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace),
+        nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace), nameof(ArrivalDamagePatch),
     };
 
     /// <summary>和 Harmony.PatchAll 一样逐个类打补丁（出错照样抛出、插件不加载），只是调试关着时跳过调试补丁。</summary>

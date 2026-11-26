@@ -471,6 +471,7 @@ internal sealed class ModeController : MonoBehaviour
             ReturnToLobby("arena error / 场地出错", arenaFault: true);
             return;
         }
+        CheckFightHud();
 
         switch (State)
         {
@@ -1306,6 +1307,42 @@ internal sealed class ModeController : MonoBehaviour
         }
         gc.HUDIn();
         GodhomePlugin.Log.LogInfo($"[Godhome] HUD 是收起的，叫回来 / the HUD was hidden, bringing it back（{why}，HUD {was} → {gc.hudCanvasSlideOut.ActiveStateName}）");
+    }
+
+    private float fightHudHidden;
+
+    /// <summary>
+    /// 每帧（没暂停时）：开战以后 HUD 一直收着就叫回来。
+    /// 例：原初罪者进场走神龛召唤，神龛的 Look Back 给 HUD 发 OUT，神龛和原初罪者的 FSM 里都没有再发 IN 的地方，
+    /// 整场没有血量显示（0.10.1 玩家报）。Boss 开场演出、打斗中的对话会收 HUD，这时人一般不能操作（对话、过场都收回了控制），
+    /// 所以只在人能操作（acceptingInput、没交出控制、没死）时才数；收着的时间（不算暂停）连续满 arena.hudGrace 秒（默认 2 秒）才叫，
+    /// 给演出自己叫回来的机会。崇高圣母灵丝：自检替玩家直接给挑战 FSM 发 INTERACT，开场演出里人能动
+    /// （玩家自己按挑战走 InteractEvents，收不收控制没核实）；原版要到 Silk Boss 的 Begin 才发 IN（挑战以后约 20 秒），
+    /// 表里写了 hudGrace 45，免得演出中途提前叫回来。
+    /// </summary>
+    private void CheckFightHud()
+    {
+        if (State != LoomState.Fight || !Arena.Started)
+        {
+            fightHudHidden = 0f;
+            return;
+        }
+        GameCameras gc = GameCameras.SilentInstance;
+        HeroController hero = HeroController.SilentInstance;
+        bool hidden = gc != null && gc.hudCanvasSlideOut != null && !gc.IsHudVisible;
+        bool canAct = hero != null && hero.acceptingInput && !hero.controlReqlinquished && !hero.cState.dead;
+        if (!hidden || !canAct)
+        {
+            fightHudHidden = 0f;
+            return;
+        }
+        float grace = CurrentBoss?.Arena.HudGrace ?? 2f;
+        fightHudHidden += Time.unscaledDeltaTime;
+        if (fightHudHidden >= grace)
+        {
+            fightHudHidden = 0f;
+            RestoreHud($"开战后一直收着 / hidden for {grace:0.#} s after the fight started（{CurrentBoss?.Id}）");
+        }
     }
 
     /// <summary>去休息点（RestStop）。</summary>

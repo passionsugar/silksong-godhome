@@ -1016,6 +1016,8 @@ internal static class Arena
         if (ok)
         {
             GodhomePlugin.Log.LogInfo(line);
+            // 调试：进场几秒内有没有碰到伤害（撞 Boss、掉岩浆），只记日志。
+            ArrivalWatch.Begin(host, b, Landed.Value);
         }
         else
         {
