@@ -44,7 +44,7 @@ internal sealed class BindingParams
 {
     public int NeedleCap = 13;
     public float NeedleLowerPercent = 0.8f;
-    public int MaxMasks = 4;
+    public int MaxMasks = 5;
     public int MaxSilk = 9;
 }
 
@@ -85,7 +85,7 @@ internal static class PantheonCatalog
             {
                 NeedleCap = Mathf.Clamp(Int(bj["needleCap"]) ?? 13, 1, 999),
                 NeedleLowerPercent = Mathf.Clamp(Float(bj["needleLowerPercent"]) ?? 0.8f, 0.05f, 1f),
-                MaxMasks = Mathf.Clamp(Int(bj["maxMasks"]) ?? 4, 1, 20),
+                MaxMasks = Mathf.Clamp(Int(bj["maxMasks"]) ?? 5, 1, 20),
                 MaxSilk = Mathf.Clamp(Int(bj["maxSilk"]) ?? 9, 1, 99),
             };
         }

@@ -1654,6 +1654,49 @@ internal sealed partial class DebugTools : MonoBehaviour
         GodhomePlugin.Log.LogInfo($"[Godhome]   万神殿自检 / pantheon check: {line}");
     }
 
+    /// <summary>
+    /// 丝技能不能放（万神殿自检“束缚生效”用）：丝给到上限，三个方向绑着的丝技逐个过 HeroController.CanThrowTool（私有，按键放时也是它）。
+    /// 没绑丝技的存档记“没有丝技”，不算失败。丝原来多少就还原多少。
+    /// </summary>
+    private static string SkillCheck(PlayerData pd, out bool ok)
+    {
+        ok = true;
+        HeroController? hc = HeroController.instance;
+        if (hc == null)
+        {
+            return "";
+        }
+        var skills = new List<(AttackToolBinding Dir, ToolItem Tool)>();
+        foreach (AttackToolBinding d in new[] { AttackToolBinding.Neutral, AttackToolBinding.Up, AttackToolBinding.Down })
+        {
+            if (ToolItemManager.GetBoundAttackTool(d, ToolEquippedReadSource.Active, out _) is ToolItem t && Bindings.IsSkill(t))
+            {
+                skills.Add((d, t));
+            }
+        }
+        if (skills.Count == 0)
+        {
+            return "，丝技 / silk skills 没有绑 / none bound";
+        }
+        int silk = pd.silk;
+        try
+        {
+            pd.silk = pd.CurrentSilkMax;
+            int can = skills.Count(s => (bool)AccessTools.Method(typeof(HeroController), "CanThrowTool").Invoke(hc, new object[] { s.Tool, s.Dir, false }));
+            ok = can == skills.Count;
+            return $"，丝技 / silk skills 能放 / castable {can}/{skills.Count}（{string.Join("、", skills.Select(s => $"{s.Dir}:{s.Tool.name}"))}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，要 / cost {pd.SilkSkillCost}）";
+        }
+        catch (Exception e)
+        {
+            ok = false;
+            return $"，丝技检查出错 / silk skill check failed: {e.GetBaseException().Message}";
+        }
+        finally
+        {
+            pd.silk = silk;
+        }
+    }
+
     private static int RawNeedle(PlayerData pd) => pd.nailUpgrades switch
     {
         0 => 5,
@@ -1990,13 +2033,18 @@ internal sealed partial class DebugTools : MonoBehaviour
                 string toolsNote = "";
                 if ((bindings & Binding.Tools) != 0)
                 {
+                    // 0.10.6：丝技（白色）不归工具束缚管，只数红、蓝、黄。
                     HeroController hc = HeroController.instance;
                     int bound = new[] { AttackToolBinding.Neutral, AttackToolBinding.Up, AttackToolBinding.Down }
-                        .Count(d => ToolItemManager.GetBoundAttackTool(d, ToolEquippedReadSource.Active, out _) != null);
-                    bool willThrow = hc != null && hc.GetWillThrowTool(false);
+                        .Count(d => ToolItemManager.GetBoundAttackTool(d, ToolEquippedReadSource.Active, out _) is ToolItem t && !Bindings.IsSkill(t));
+                    bool willThrow = hc != null && hc.GetWillThrowTool(false) && !Bindings.IsSkill(Traverse.Create(hc).Field("willThrowTool").GetValue<ToolItem>());
                     toolsOk = bound == 0 && !willThrow;
                     toolsNote = $"，工具 / tools 能扔的方向 / throwable bindings {bound}，主角要扔 / hero will throw {willThrow}，念珠 / rosaries {pd.geo}，碎片 / shards {pd.ShellShards}";
                 }
+                // 0.10.6 实测清单第 8 条：开着灵丝束缚放不了法术。丝给到上限（束缚下 9），每个方向绑着的丝技都要能放（CanThrowTool，和按键放时同一个判断）。
+                string skillNote = SkillCheck(pd, out bool skillsOk);
+                toolsOk &= skillsOk;
+                toolsNote += skillNote;
                 Check("束缚生效 / bindings in effect", Bindings.Active == bindings && needleOk && maskOk && silkOk && toolsOk && pd.health <= pd.CurrentMaxHealth,
                     $"织针 / needle {pd.nailDamage}（原 / raw {raw}），面具 / masks {pd.health}/{pd.CurrentMaxHealth}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，Active={Bindings.Describe(Bindings.Active)}{toolsNote}");
             }

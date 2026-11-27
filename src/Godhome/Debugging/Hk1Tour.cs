@@ -418,11 +418,65 @@ internal static class Hk1Tour
             {
                 List<Hk1Hall.Slot> all = Hk1Hall.Slots.OrderBy(s => s.Statue.transform.position.y).ThenBy(s => s.Statue.transform.position.x).ToList();
                 Log("手办屋 / hall: " + Hk1Hall.Note);
-                Check(all.Count == 36, $"雕像 / statues: {all.Count}");
+                // 0.10.7：拆开 7 对合并以后 43 尊（前作 36 尊 + 骑士雕像 + 复制的 6 尊）。
+                Check(all.Count == 43, $"雕像 / statues: {all.Count}（要 / want 43）");
                 int painted = all.Count(s => s.MainArt != null && s.MainArt.sprite != null);
                 Check(painted == all.Count, $"换成本作石像 / painted with our statues: {painted}/{all.Count}");
                 Log("雕像 / statues: " + string.Join("，", all.Select(s => $"{s.Name.Replace("GG_Statue_", "")}={s.Shown.Id}{(s.Def.Variants.Count > 1 ? $"({s.Def.Variants.Count})" : "")}")));
                 yield return Shot("workshop-arrive");
+                // 0.10.6 实测清单：推杆只切同一个 Boss 的形态，手办屋要再放 7 尊。量两层地面哪里平（每 1 格往下打一条射线），
+                // 列出现有雕像的位置和底座宽，在右边空着的地方截几张图（不改场景）。
+                {
+                    string Floor(float from)
+                    {
+                        var runs = new List<string>();
+                        float start = float.NaN, level = float.NaN;
+                        void Close(float end)
+                        {
+                            if (!float.IsNaN(start) && end - start >= 3f)
+                            {
+                                runs.Add($"{start:0}–{end:0}@{level:0.0}");
+                            }
+                            start = float.NaN;
+                        }
+                        for (float x = -10f; x <= 272f; x += 1f)
+                        {
+                            var o = new Vector2(x, from);
+                            RaycastHit2D g = Physics2D.OverlapPoint(o, 1 << 8) == null ? Physics2D.Raycast(o, Vector2.down, 26f, 1 << 8) : default;
+                            float y = g.collider != null ? Mathf.Round(g.point.y * 2f) / 2f : float.NaN;
+                            if (float.IsNaN(y) || float.IsNaN(start) || Mathf.Abs(y - level) > 0.6f)
+                            {
+                                Close(x - 1f);
+                                if (!float.IsNaN(y))
+                                {
+                                    start = x;
+                                    level = y;
+                                }
+                            }
+                        }
+                        Close(272f);
+                        return string.Join("，", runs);
+                    }
+                    Log($"手办屋地面 / hall floor：下层 / lower（从 y 12 往下）{Floor(12f)} ‖ 上层 / upper（从 y 42 往下）{Floor(42f)}");
+                    Log("现有雕像 / statues now: " + string.Join("，", Object.FindObjectsByType<BossStatue>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                        .OrderBy(s => s.transform.position.y).ThenBy(s => s.transform.position.x)
+                        .Select(s =>
+                        {
+                            SpriteRenderer? plinth = s.transform.Find("Base/GG_statues_0001_plinth_02")?.GetComponent<SpriteRenderer>();
+                            return $"{s.name.Replace("GG_Statue_", "")}({s.transform.position.x:0.0},{s.transform.position.y:0.0}"
+                                + $"{(plinth != null ? $" 宽 / w {plinth.bounds.size.x:0.0}" : "")}{(s.gameObject.activeInHierarchy ? "" : " off")})";
+                        })));
+                    // 0.10.7：复制的 6 尊、骑士雕像、有几个形态的雕像（查实测清单第 2 条“缺推杆”、第 4 条红光、第 5 条大小）逐尊截图。
+                    foreach (Hk1Hall.Slot s in all.Where(s => s.Name.Contains("Godhome_") || s.Name.EndsWith("_Knight") || s.Def.Variants.Count > 1))
+                    {
+                        Vector3 sp = s.Statue.transform.position;
+                        BossStatueLever? lv = s.Statue.GetComponentsInChildren<BossStatueLever>(true).FirstOrDefault();
+                        Log($"雕像 / statue {s.Name}：{string.Join("/", s.Def.Variants.Select(v => v.Id))}，露出 / shown {s.Shown.Id}，拉杆 / lever {(lv == null ? "-" : lv.gameObject.activeInHierarchy ? "在 / shown" : "关 / off")}，"
+                            + $"红光 / glow {(s.Glow == null ? "-" : s.Glow.activeInHierarchy ? "亮 / on" : "灭 / off")}，石像 / art {(s.MainArt != null && s.MainArt.sprite != null ? $"{s.MainArt.bounds.size.x:0.0}×{s.MainArt.bounds.size.y:0.0}" : "-")}");
+                        yield return Go(sp.x - 2.5f, sp.y);
+                        yield return Shot("statue-" + s.Name.Replace("GG_Statue_", ""));
+                    }
+                }
                 // 门口的总览板：每个本作 Boss 一行，名字是我们的。
                 {
                     int want = all.Sum(s => s.Def.Variants.Count);
@@ -586,6 +640,51 @@ internal static class Hk1Tour
                         yield return Until(() => Scene() == Hk1Lobby.Atrium && HubReady(), 60f);
                         Check(Scene() == Hk1Lobby.Atrium && HubReady(), $"走回前厅 / walked back to the atrium: {Where()}");
                     }
+                }
+            }
+            // 0.10.6 实测清单第 7 条：在神居地图掉出边界后复活了却动不了，按一次 Esc 才好。照玩家：把人放到前厅最底下以外，
+            // 看是谁让人复活（危险复活、转场还是没人管）、复活后能不能操作。没人管就把人放回原处接着巡视。
+            if (Same() && HubReady() && Scene() == Hk1Lobby.Atrium)
+            {
+                HeroController h = Hero();
+                Vector3 back = h.transform.position;
+                string Flags() => $"input={h.acceptingInput} relinquished={h.controlReqlinquished} enterWithoutInput={h.enterWithoutInput} "
+                    + $"hazardDeath={h.cState.hazardDeath} hazardRespawning={h.cState.hazardRespawning} transitioning={h.cState.transitioning} "
+                    + $"blocked={h.IsInputBlocked()} 游戏状态 / game state {GameManager.instance.GameState} timeScale {Time.timeScale:0.##}";
+                Log($"掉出边界前 / before falling out: {Where()}，场景大小 / scene size {GameManager.instance.sceneWidth:0}×{GameManager.instance.sceneHeight:0}，{Flags()}");
+                h.transform.position = new Vector3(back.x, -20f, back.z);
+                Physics2D.SyncTransforms();
+                float t0 = Time.unscaledTime;
+                bool hazard = false;
+                string firstSeen = "";
+                while (Time.unscaledTime - t0 < 15f && Same() && Scene() == Hk1Lobby.Atrium)
+                {
+                    if (!hazard && (h.cState.hazardDeath || h.cState.hazardRespawning))
+                    {
+                        hazard = true;
+                        firstSeen = $"{Time.unscaledTime - t0:0.0}s {Where()}";
+                    }
+                    if (!h.cState.hazardDeath && !h.cState.hazardRespawning && !h.cState.transitioning && !GameManager.instance.IsInSceneTransition
+                        && h.transform.position.y > 0f && Time.unscaledTime - t0 > 1f)
+                    {
+                        break;
+                    }
+                    yield return null;
+                }
+                Log($"掉出边界 / fell out: 危险复活 / hazard respawn {hazard}（{(firstSeen.Length > 0 ? firstSeen : "-")}），现在 / now {Where()}，{Flags()}");
+                // 0.10.7 巡视：掉出去以后游戏把人从前厅入口重新送进前厅（不是危险复活），进来一直不接输入。看门狗（Hk1Lobby.InputWatch）2 秒接上。
+                bool back2 = h.transform.position.y > 0f;
+                if ((hazard || back2) && Scene() == Hk1Lobby.Atrium)
+                {
+                    yield return Until(() => h.acceptingInput && !h.controlReqlinquished, 4f);
+                    Check(h.acceptingInput && !h.controlReqlinquished, $"掉出边界回来后能操作 / control after coming back from out of bounds: {Where()}，{Flags()}");
+                    yield return Shot("fell-out-back");
+                }
+                else if (Scene() == Hk1Lobby.Atrium)
+                {
+                    Log("掉出边界没人管，放回原处 / nothing respawned the hero; putting her back");
+                    Sanctum.StandAt(h, back.x, back.y - 1f);
+                    yield return new WaitForSecondsRealtime(1.5f);
                 }
             }
             if (Same() && HubReady() && Scene() == Hk1Lobby.Atrium)

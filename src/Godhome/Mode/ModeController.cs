@@ -460,6 +460,7 @@ internal sealed class ModeController : MonoBehaviour
         if (State == LoomState.Lobby)
         {
             heroRecovery.CheckLobby(gm, fightSerial);
+            Hk1Lobby.InputWatch();
         }
 
         if (GodhomeConfig.LoomKey.Value.IsDown())

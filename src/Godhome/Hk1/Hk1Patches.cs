@@ -767,3 +767,40 @@ internal static class DoorLockUiPatch
         }
     }
 }
+
+/// <summary>
+/// 前作神居里掉出边界，危险复活以后人动不了，按一次 Esc 才好（0.10.6 实测清单第 7 条）。暂停再继续时 HeroController.UnPauseInput
+/// 只要没被收走控制就把 acceptingInput 设回 true，说明复活后卡在“没收走控制、却不接输入”：HazardRespawn 最后走
+/// FinishedEnteringScene，它看到 enterWithoutInput 就不调 AcceptInput（前作场景的 FSM 会 SendMessage 设这个标志，等前作的下一段演出交还）。
+/// 只管前作神居里的危险复活：复活前清掉这个标志；复活完要是还不接输入、又没被收走控制，照暂停继续的做法接上输入。两步都记日志。
+/// </summary>
+[HarmonyPatch(typeof(HeroController), "FinishedEnteringScene")]
+internal static class Hk1HazardRespawnInputPatch
+{
+    private static readonly AccessTools.FieldRef<HeroController, bool> DoingHazardRespawn = AccessTools.FieldRefAccess<HeroController, bool>("doingHazardRespawn");
+
+    private static void Prefix(HeroController __instance, out bool __state)
+    {
+        __state = Hk1Lobby.InHub && DoingHazardRespawn(__instance);
+        if (__state && __instance.enterWithoutInput)
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作神居危险复活：清掉进场不接输入 / hk1 hazard respawn: cleared enterWithoutInput（relinquished={__instance.controlReqlinquished} input={__instance.acceptingInput}）");
+            __instance.EnterWithoutInput(false);
+        }
+    }
+
+    private static void Postfix(HeroController __instance, bool __state)
+    {
+        if (!__state)
+        {
+            return;
+        }
+        bool fixedInput = !__instance.acceptingInput && !__instance.controlReqlinquished && !__instance.cState.dead;
+        if (fixedInput)
+        {
+            __instance.AcceptInput();
+        }
+        GodhomePlugin.Log.LogInfo($"[Godhome] 前作神居危险复活完 / hk1 hazard respawn done: input={__instance.acceptingInput} relinquished={__instance.controlReqlinquished}"
+            + (fixedInput ? "（原来不接输入，已接上 / input was off, turned on）" : ""));
+    }
+}

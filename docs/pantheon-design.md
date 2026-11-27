@@ -18,7 +18,7 @@
 - **门的样子**按完成情况变化（`BossDoorCompletionStates`）：完成、全束缚、无伤各有装饰。第五扇门在前四扇都完成前被笼子关着（`BossDoorCage`）。
 - **四种束缚**：
   - 骨钉：伤害封顶 13，已经低于封顶就打八折。
-  - 外壳：最多 4 格血。
+  - 外壳：最多 5 格血（前作 4 格；丝之歌一次扣两格的攻击多，0.10.6 实测反馈改成 5）。
   - 护符：全部卸下。
   - 灵魂：灵魂上限压到一格法术、没有备用灵魂。
 
@@ -51,7 +51,7 @@
 | 前作 | 本作 | 效果（0.8.0 实装） | 做法 |
 |---|---|---|---|
 | 骨钉 | 织针束缚 | 伤害封顶 13；本来就不超过 13 的打八折（照前作 `BoundNailDamage`）。满级织针 21 → 13 | 补丁 `PlayerData.nailDamage` 的 getter，`BossSequenceController.BoundNail` / `BoundNailDamage` 也一起补 |
-| 外壳 | 面具束缚 | 最多 4 格血（丝之歌起始 5 格，照前作“比起始少一格”） | `PlayerData.CurrentMaxHealth` 自己会看 `BoundShell`：补丁 `BoundShell` / `BoundMaxHealth` |
+| 外壳 | 面具束缚 | 最多 5 格血（原来照前作“比起始少一格”是 4 格；丝之歌一次扣两格的攻击多，4 格挨两下就死，0.10.6 实测反馈改成 5） | `PlayerData.CurrentMaxHealth` 自己会看 `BoundShell`：补丁 `BoundShell` / `BoundMaxHealth` |
 | 护符 | 工具束缚 | 所有工具（红、蓝、黄）都不算装备，纹章不动；存档里的装备不改 | 补丁 `ToolItemManager.IsToolEquipped`（两个重载） |
 | 灵魂 | 灵丝束缚 | 丝上限压到 9（刚够一次缚丝回血） | 补丁 `PlayerData.CurrentSilkMaxBasic` / `CurrentSilkMax` |
 

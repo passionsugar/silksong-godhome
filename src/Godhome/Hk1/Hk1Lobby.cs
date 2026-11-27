@@ -211,6 +211,47 @@ internal static class Hk1Lobby
         }
     }
 
+    private static float stuckSince = -1f;
+
+    /// <summary>
+    /// 前作神居里人“没被收走控制、却不接输入”超过 2 秒：照暂停再继续的做法接上输入（HeroController.UnPauseInput 也是只要没被收走控制
+    /// 就把 acceptingInput 设回 true，所以这不会比玩家按一次 Esc 多放开什么）。
+    /// 0.10.6 实测清单第 7 条：掉出前厅边界以后，游戏把人从前厅的入口（door_dreamEnter_ReturnGGMode）重新送进前厅，
+    /// 进来以后一直不接输入，按一次 Esc 才好；巡视 0.10.7 复现了：重进前厅 15 秒后 input=False relinquished=False。
+    /// 界面、长椅、物品栏、交互、转场、死亡、危险复活中都不管。每次接上都记一条日志（场景、位置、入口），之后查是谁关掉的输入。
+    /// </summary>
+    internal static void InputWatch()
+    {
+        HeroController? hero = HeroController.SilentInstance;
+        GameManager? gm = GameManager.UnsafeInstance;
+        PlayerData? pd = PlayerData.instance;
+        bool stuck = InHub && hero != null && gm != null && pd != null
+            && gm.GameState == GlobalEnums.GameState.PLAYING && !gm.IsGamePaused() && !gm.IsInSceneTransition
+            && !hero.acceptingInput && !hero.controlReqlinquished
+            && !hero.cState.dead && !hero.cState.transitioning && !hero.cState.hazardDeath && !hero.cState.hazardRespawning
+            && !InteractionBlocked && !Sanctum.Busy && InteractManager.BlockingInteractable == null
+            && !pd.atBench && !pd.isInventoryOpen;
+        if (!stuck)
+        {
+            stuckSince = -1f;
+            return;
+        }
+        if (stuckSince < 0f)
+        {
+            stuckSince = Time.unscaledTime;
+            return;
+        }
+        if (Time.unscaledTime - stuckSince < 2f)
+        {
+            return;
+        }
+        stuckSince = -1f;
+        hero!.AcceptInput();
+        Vector3 p = hero.transform.position;
+        GodhomePlugin.Log.LogWarning($"[Godhome] 前作神居：人没被收走控制却 2 秒不接输入，已接上 / hk1 godhome: input was off for 2 s without a control lock, turned it on"
+            + $"（{gm!.GetSceneNameString()} ({p.x:0.0}, {p.y:0.0})，入口 / entry {gm.entryGateName}，enterWithoutInput={hero.enterWithoutInput}，状态 / state {hero.hero_state}）");
+    }
+
     /// <summary>
     /// 前作神居里的门（TransitionPoint）转场时不带场景的位置（前作的场景不在丝之歌的资源里），
     /// 去前作的三个房间时补上重新打包好的位置，不然丝之歌找不到场景。

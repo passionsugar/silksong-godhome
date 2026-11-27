@@ -20,18 +20,34 @@ namespace Godhome;
 /// </summary>
 internal static class Hk1Hall
 {
-    /// <summary>前作手办屋下层的雕像，从左到右（试验时从场景里读出来的位置）。</summary>
+    /// <summary>
+    /// 前作手办屋下层的雕像，从左到右（试验时从场景里读出来的位置）。Godhome_ 开头的是复制出来的（Extra）。
+    /// （x 249.9 的 GG_Statue_Knight 只是摆设，没有 BossStatue，用不上。）
+    /// </summary>
     private static readonly string[] Lower =
     {
         "Gruz", "Vengefly", "Mawlek", "FalseKnight", "Hornet", "MegaMossCharger", "Flukemarm", "MantisLords", "Oblobbles",
         "HiveKnight", "Vessel", "Nosk", "Collector", "GodTamer", "CrystalGuardian", "Uumuu", "TraitorLord", "GreyPrince",
+        "Godhome_L205", "Godhome_L217", "Godhome_L226", "Godhome_L234",
     };
 
     /// <summary>上层，从左到右。</summary>
     private static readonly string[] Upper =
     {
-        "Mage_Knight", "SoulMaster", "Defender", "WatcherKnights", "NoEyes", "Marmu", "Xero", "Markoth", "Galien", "Gorb",
-        "ElderHu", "Nailmasters", "Paintmaster", "Sly", "HollowKnight", "Grimm",
+        "Mage_Knight", "SoulMaster", "Defender", "Godhome_U65", "WatcherKnights", "NoEyes", "Marmu", "Xero", "Markoth", "Galien", "Gorb",
+        "ElderHu", "Nailmasters", "Godhome_U155", "Paintmaster", "Sly", "HollowKnight", "Grimm", "Godhome_U202",
+    };
+
+    /// <summary>
+    /// 复制出来的雕像（0.10.6 实测清单：推杆只切同一个 Boss 的形态，拆开 7 对合并以后前作的雕像不够）：名字、照哪尊复制、放在哪（x）。
+    /// 位置是 0.10.7 巡视量的地面（从两层地面上方往下打射线）和截图：下层灰色王子右边（x 205，平地 21–207）、装饰门柱右边（217.5，平地 213–222；
+    /// 门柱 208–212 高出一截）、装饰墙前面（226、234）；上层守卫骑士和守望骑士之间（65.2）、针师和画师之间（155.5）、格林右边（202）。
+    /// 高度按复制源的底座到地面的距离，地面照射线现找；找不到地面就不放、记警告。
+    /// </summary>
+    private static readonly (string Name, string From, float X)[] Extra =
+    {
+        ("Godhome_L205", "Gruz", 205f), ("Godhome_L217", "Gruz", 217.5f), ("Godhome_L226", "Gruz", 226f), ("Godhome_L234", "Gruz", 234f),
+        ("Godhome_U65", "Gorb", 65.2f), ("Godhome_U155", "Gorb", 155.5f), ("Godhome_U202", "Gorb", 202f),
     };
 
     private const string Prefix = "GG_Statue_";
@@ -49,8 +65,17 @@ internal static class Hk1Hall
         public SpriteRenderer? AltArt;
         public string Pd = "";
 
-        public BossDef Shown => Def.Variants[UsingAlt ? Alt : Main];
+        /// <summary>前作梦境版的那圈红光（BossStatueDreamToggle.litPieces）：露出来的不是第一个形态时亮。</summary>
+        public GameObject? Glow;
+        public ColorFader[] GlowFaders = Array.Empty<ColorFader>();
+
+        public int ShownIndex => UsingAlt ? Alt : Main;
+
+        public BossDef Shown => Def.Variants[ShownIndex];
     }
+
+    /// <summary>石像最高多高（世界单位；前作最高的螳螂领主的画约 11.7）。按 Boss 真实大小摆，太高的压到这个高度。</summary>
+    private const float StatueMaxHeight = 13f;
 
     private static Dictionary<string, List<string>> merge = new();
     private static Dictionary<string, string> special = new();
@@ -184,6 +209,7 @@ internal static class Hk1Hall
     {
         Forget();
         Dictionary<string, StatueDef> map = Assignment();
+        AddExtra(scene);
         GameObject[] roots = scene.GetRootGameObjects();
         OpenHidden(roots);
         GodhomeSaveData rec = GodhomePlugin.Instance.Records;
@@ -219,6 +245,14 @@ internal static class Hk1Hall
                 WireStatue(slot, ref levers);
                 slot.MainArt = Dress(st.statueDisplay, "main");
                 slot.AltArt = Dress(st.statueDisplayAlt, "alt");
+                float maxW = WidthFor(st, roots);
+                foreach (SpriteRenderer? shown in new[] { slot.MainArt, slot.AltArt })
+                {
+                    if (shown != null && shown.GetComponent<Hk1StatueFit>() is Hk1StatueFit f)
+                    {
+                        f.MaxWidth = maxW;
+                    }
+                }
                 if (Paint(slot))
                 {
                     art++;
@@ -240,6 +274,117 @@ internal static class Hk1Hall
             // 还有没雕的：黑幕挡着，到场后雕（雕好有缓存，下次进来就不用等）。
             Busy = true;
             LoomUI.Instance?.Cover(1f, () => Busy);
+        }
+    }
+
+    /// <summary>
+    /// 照前作的雕像复制几尊放到空地上（Extra）。复制时雕像已经 Awake 过（回程门名字接过雕像名），复制品自己的 Awake 又接一次：
+    /// 改回 door_dreamReturnGG_ + 新名字（ReturnTo、死后复活点都按这个名字找）。镜头锁的高度在 Awake 里按位置算，同一层不用改。
+    /// </summary>
+    private static void AddExtra(Scene scene)
+    {
+        var made = new List<string>();
+        foreach ((string name, string from, float x) in Extra)
+        {
+            GameObject? src = scene.GetRootGameObjects().FirstOrDefault(r => r.name == Prefix + from);
+            if (src == null || scene.GetRootGameObjects().Any(r => r.name == Prefix + name))
+            {
+                if (src == null)
+                {
+                    GodhomePlugin.Log.LogWarning($"[Godhome] 前作手办屋：复制源不在 / hk1 hall: copy source missing {Prefix + from}");
+                }
+                continue;
+            }
+            Vector3 sp = src.transform.position;
+            float? srcGround = Ground(sp.x, sp.y + 3f);
+            float? ground = Ground(x, sp.y + 3f);
+            if (srcGround == null || (ground != null && Mathf.Abs(ground.Value - srcGround.Value) > 1.5f))
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] 前作手办屋：{name} 那里的地面和复制源不一样高，不放 / hk1 hall: floor for {name} at x {x:0.0} differs（复制源地面 / source floor {srcGround?.ToString("0.0") ?? "-"}，这里 / here {ground?.ToString("0.0") ?? "-"}）");
+                continue;
+            }
+            if (ground == null)
+            {
+                // 第一次加载手办屋时右边那段的地形碰撞还没建好（0.10.7 巡视：第一次 L205、L217 打不到地面，之后再进就有，量出来都是 5.0），
+                // 按复制源的地面高度放（Extra 的位置都是量过和复制源同一层平地的）。
+                GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：{name} 那里暂时打不到地面，按复制源的地面 {srcGround.Value:0.0} 放 / hk1 hall: no floor hit for {name} yet; using the source floor");
+                ground = srcGround;
+            }
+            GameObject copy = Object.Instantiate(src);
+            SceneManager.MoveGameObjectToScene(copy, scene);
+            copy.name = Prefix + name;
+            copy.transform.position = new Vector3(x, ground.Value + (sp.y - srcGround.Value), sp.z);
+            BossStatue? st = copy.GetComponent<BossStatue>();
+            if (st != null && st.dreamReturnGate != null)
+            {
+                st.dreamReturnGate.name = Hk1Lobby.ReturnGatePrefix + copy.name;
+            }
+            made.Add($"{name}({x:0.0},{copy.transform.position.y:0.0})");
+        }
+        if (made.Count > 0)
+        {
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：复制的雕像 / hk1 hall: copied statues {string.Join("，", made)}");
+        }
+    }
+
+    /// <summary>x 处从 fromY 往下 12 格内的地面高度（地形层）；起点在地形里或者找不到返回 null。</summary>
+    private static float? Ground(float x, float fromY)
+    {
+        var o = new Vector2(x, fromY);
+        if (Physics2D.OverlapPoint(o, 1 << 8) != null)
+        {
+            return null;
+        }
+        RaycastHit2D g = Physics2D.Raycast(o, Vector2.down, 12f, 1 << 8);
+        return g.collider != null ? g.point.y : null;
+    }
+
+    /// <summary>石像的宽度上限：同一层（高度差 3 以内）最近的邻居雕像离多远，减掉 2（两边各留 1），至少 5，最多 12。</summary>
+    private static float WidthFor(BossStatue st, GameObject[] roots)
+    {
+        Vector3 p = st.transform.position;
+        float gap = roots.SelectMany(r => r.GetComponentsInChildren<BossStatue>(true))
+            .Where(o => o != st && Mathf.Abs(o.transform.position.y - p.y) < 3f)
+            .Select(o => Mathf.Abs(o.transform.position.x - p.x))
+            .DefaultIfEmpty(14f).Min();
+        return Mathf.Clamp(gap - 2f, 5f, 12f);
+    }
+
+    /// <summary>
+    /// 红光（前作梦境版底座旁的那圈）：露出来的不是第一个形态时亮（实测清单第 4 条：前作切到第二形态时才有）。
+    /// fade = true 时照前作淡入淡出（ColorFader），否则直接开关。
+    /// </summary>
+    internal static void SetGlow(Slot s, bool fade)
+    {
+        if (s.Glow == null)
+        {
+            return;
+        }
+        bool on = s.ShownIndex != 0;
+        if (on)
+        {
+            s.Glow.SetActive(true);
+            foreach (ColorFader f in s.GlowFaders)
+            {
+                if (f != null)
+                {
+                    f.Fade(up: true);
+                }
+            }
+        }
+        else if (fade && s.Glow.activeInHierarchy && s.GlowFaders.Length > 0)
+        {
+            foreach (ColorFader f in s.GlowFaders)
+            {
+                if (f != null)
+                {
+                    f.Fade(up: false);
+                }
+            }
+        }
+        else
+        {
+            s.Glow.SetActive(false);
         }
     }
 
@@ -304,22 +449,61 @@ internal static class Hk1Hall
                 st.dreamStatueStatePD = "godhome_alt_" + slot.Def.Id;
             }
         }
+        else
+        {
+            // 前作有梦境版的雕像（失败的冠军之类）上放了只有一个形态的 Boss：底座照前作会摆左右两块牌子（BossStatue.SetPlaquesVisible
+            // 看 dreamBossScene），像是还有第二个形态（实测清单第 3 条）。去掉梦境版，只摆中间一块。
+            st.dreamBossScene = null!;
+            st.dreamStatueStatePD = "";
+        }
         foreach (BossStatueDreamToggle d in st.GetComponentsInChildren<BossStatueDreamToggle>(true))
         {
-            d.gameObject.SetActive(false);
+            // 梦之钉开关本身不用（丝之歌没有梦之钉）。它亮的那圈红光（litPieces）留给有几个形态的雕像：露出来的不是第一个形态时亮（SetGlow）。
+            // 开关所在的那组物体里，红光以外的（梦境球的底座、粒子）都关掉；组件关掉，它的 Start 不会再按梦境版去开关红光。
+            d.enabled = false;
+            GameObject? lit = d.litPieces;
+            Transform? group = lit != null ? lit.transform.parent : null;
+            if (multi && slot.Glow == null && lit != null && group != null)
+            {
+                slot.Glow = lit;
+                slot.GlowFaders = lit.GetComponentsInChildren<ColorFader>(true);
+                foreach (Transform c in group)
+                {
+                    c.gameObject.SetActive(false);
+                }
+                group.gameObject.SetActive(true);
+                if (d.transform != group)
+                {
+                    d.gameObject.SetActive(false);
+                }
+            }
+            else
+            {
+                d.gameObject.SetActive(false);
+            }
         }
         BossStatueLever? lever = st.GetComponentsInChildren<BossStatueLever>(true).FirstOrDefault();
+        // 拉杆在 alt_lever 下面（架子 GG_statue_switch_bracket、拉杆 GG_statue_switch_lever）：前作只有变体雕像的 alt_lever 是开着的，
+        // 以前只开了拉杆本身，父物体关着，大多数有几个形态的雕像看不到拉杆（实测清单第 2 条）。
+        Transform? rack = lever != null ? lever.transform : null;
+        while (rack != null && rack.parent != null && rack.parent != st.transform)
+        {
+            rack = rack.parent;
+        }
         if (multi && lever != null)
         {
-            lever.gameObject.SetActive(true);
+            for (Transform? t = lever.transform; t != null && t != st.transform; t = t.parent)
+            {
+                t.gameObject.SetActive(true);
+            }
             ToggleField(st) = lever;
             levers++;
         }
         else
         {
-            if (lever != null)
+            if (rack != null)
             {
-                lever.gameObject.SetActive(false);
+                rack.gameObject.SetActive(false);
             }
             ToggleField(st) = null!;
             if (multi)
@@ -388,10 +572,13 @@ internal static class Hk1Hall
         mine.color = Color.white;
         var fit = go.AddComponent<Hk1StatueFit>();
         fit.Mat = mine.sharedMaterial;
-        fit.Bottom = new Vector3(box.center.x, box.min.y, big.transform.position.z);
-        fit.MaxHeight = Mathf.Max(2f, box.size.y);
-        // 前作的雕像大多和底座差不多宽：别比原来的宽太多（太宽会伸出底座、显得飘）。
-        fit.MaxWidth = Mathf.Max(2f, box.size.x * 1.3f);
+        // 底边中点记在父物体（前作那张画）的本地坐标里：前作的沉下升起动画移动的是父物体，
+        // 以前记世界坐标，在雕像沉在地下时换图（拉杆换版本时两个展示物体都重新摆）就会偏出底座，下次换图又瞬移回来（实测清单第 6 条）。
+        fit.LocalBottom = big.transform.InverseTransformPoint(new Vector3(box.center.x, box.min.y, big.transform.position.z));
+        // 大小按 Boss 真实大小（雕出来的石像就是 Boss 的世界尺寸），所有雕像同一个比例；太高、太宽的压下来（实测清单第 5 条）。
+        // 宽度上限 Prepare 里按同一层左右邻居的间距再定。
+        fit.MaxHeight = StatueMaxHeight;
+        fit.MaxWidth = 8f;
         return mine;
     }
 
@@ -449,6 +636,7 @@ internal static class Hk1Hall
         }
         s.UsingAlt = toAlt;
         Paint(s);
+        SetGlow(s, fade: true);
         GodhomePlugin.Instance.Records.StatueVariant[s.Def.Id] = s.Def.Variants[next].Id;
         GodhomePlugin.Log.LogInfo($"[Godhome] 前作雕像换版本 / hk1 statue variant: {s.Name} → {s.Def.Variants[next].Id}");
     }
@@ -468,6 +656,24 @@ internal static class Hk1Hall
             host.StartCoroutine(CarveRoutine(t));
         }
         host.StartCoroutine(InspectWatch(t));
+        host.StartCoroutine(GlowAfterStart(t));
+    }
+
+    /// <summary>雕像、渐变组件的 Start 跑过以后（下一帧）按当前露出来的形态开关红光。</summary>
+    private static IEnumerator GlowAfterStart(int t)
+    {
+        yield return null;
+        if (!Alive(t))
+        {
+            yield break;
+        }
+        int on = 0;
+        foreach (Slot s in slots.Values)
+        {
+            SetGlow(s, fade: false);
+            on += s.Glow != null && s.Glow.activeSelf ? 1 : 0;
+        }
+        GodhomePlugin.Log.LogInfo($"[Godhome] 前作雕像的红光 / hk1 statue glows: {slots.Values.Count(s => s.Glow != null)} 尊有 / statues have one，亮着 / lit {on}");
     }
 
     private static bool Alive(int t) => t == token && Hk1Lobby.Active && ModeController.Instance != null && ModeController.Instance.State == LoomState.Lobby
@@ -527,11 +733,14 @@ internal static class Hk1Hall
     }
 }
 
-/// <summary>石像摆放：底边中点对在前作雕像画的底边中点，高度不超过前作的画（宽度也有上限）。</summary>
+/// <summary>
+/// 石像摆放：底边中点对在前作雕像画的底边中点（记在父物体的本地坐标里，跟着前作的沉下升起动画走）；
+/// 大小是 Boss 的真实大小（所有雕像同一个比例），超过高度、宽度上限的压下来。
+/// </summary>
 internal sealed class Hk1StatueFit : MonoBehaviour
 {
-    public Vector3 Bottom;
-    public float MaxHeight = 6f;
+    public Vector3 LocalBottom;
+    public float MaxHeight = 13f;
     public float MaxWidth = 8f;
     public Material? Mat;
 
@@ -571,12 +780,12 @@ internal sealed class Hk1StatueFit : MonoBehaviour
         Vector3 ps = p != null ? p.lossyScale : Vector3.one;
         Bounds b = r.sprite.bounds;
         float h = Mathf.Max(0.01f, b.size.y), w = Mathf.Max(0.01f, b.size.x);
-        float s = Mathf.Min(MaxHeight / h, MaxWidth / w);
+        float s = Mathf.Min(1f, Mathf.Min(MaxHeight / h, MaxWidth / w));
         // 世界缩放 = s；本地缩放要除掉父物体的缩放（前作的画可能是翻过来的：保留符号）。
         t.localScale = new Vector3(s / Mathf.Max(0.0001f, Mathf.Abs(ps.x)) * Mathf.Sign(ps.x == 0 ? 1 : ps.x), s / Mathf.Max(0.0001f, Mathf.Abs(ps.y)), 1f);
         t.localRotation = Quaternion.identity;
-        // 世界位置：精灵的底边中点放到 Bottom。
-        Vector3 pivotToBottom = new(b.center.x * s, b.min.y * s, 0f);
-        t.position = new Vector3(Bottom.x - pivotToBottom.x, Bottom.y - pivotToBottom.y, Bottom.z - 0.01f);
+        // 本地位置：精灵的底边中点放到 LocalBottom（父物体空间里，精灵上一点 = 位置 + 本地缩放 × 精灵里的坐标）。
+        Vector3 ls = t.localScale;
+        t.localPosition = new Vector3(LocalBottom.x - b.center.x * ls.x, LocalBottom.y - b.min.y * ls.y, LocalBottom.z - 0.01f);
     }
 }

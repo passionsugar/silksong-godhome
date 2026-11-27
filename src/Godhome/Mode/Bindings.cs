@@ -16,7 +16,7 @@ internal enum Binding
     /// <summary>面具束缚（前作外壳）：最多几格血。</summary>
     Mask = 2,
 
-    /// <summary>工具束缚（前作护符）：所有工具（红、蓝、黄）都不算装备。</summary>
+    /// <summary>工具束缚（前作护符）：所有工具（红、蓝、黄）都不算装备；丝技（白色）照前作护符束缚不管法术，照常能放。</summary>
     Tools = 4,
 
     /// <summary>灵丝束缚（前作灵魂）：丝上限压低。</summary>
@@ -35,9 +35,13 @@ internal enum Binding
 /// - 面具：PlayerData.CurrentMaxHealth 本来就是“BoundShell 时取 Min(maxHealth, BoundMaxHealth)”（前作的逻辑还在），
 ///   但 BoundShell / BoundMaxHealth 读的是前作的连战数据（丝之歌里没人设，BoundMaxHealth 直接读会空引用）。
 ///   补丁这两个：束缚时 BoundShell = true、BoundMaxHealth = 上限。HUD 面具上前作的 GGCheckBoundHeart 也看这两个。
-/// - 工具：ToolItemManager.IsToolEquipped（两个重载，ToolItem.IsEquipped / IsEquippedHud 都走它）束缚时一律返回 false，
+/// - 工具：ToolItemManager.IsToolEquipped（两个重载，ToolItem.IsEquipped / IsEquippedHud 都走它）束缚时返回 false，
 ///   和游戏自己的 ToolsActiveStates.Disabled 一样的效果，但不会被场景里的 FSM 改回来。开关时发一次装备变化事件刷新缓存和 HUD。
+///   丝技（ToolItemType.Skill，白色）不算：它和红色工具一样经 GetBoundAttackTool 放出来（HeroController.GetWillThrowTool / ThrowTool），
+///   以前一并挡掉，套着工具束缚就放不了法术（0.10.6 实测清单第 8 条）。前作的护符束缚也不管法术。
 /// - 灵丝：PlayerData.CurrentSilkMaxBasic（HUD 的丝轴按它画）和 CurrentSilkMax（回丝、缚丝判断用）都压到上限。
+///   丝轴的长度只在 SilkSpool.DrawSpool 里按 CurrentSilkMaxBasic 画，游戏只在丝上限变的时候调它：套上、解开时自己调一次，
+///   不然丝轴还是原来的长度，只填到 9，看不出上限（实测清单第 9 条）。
 /// </summary>
 internal static class Bindings
 {
@@ -82,6 +86,9 @@ internal static class Bindings
         return string.Join("、", parts);
     }
 
+    /// <summary>丝技（白色）：工具束缚不管它。</summary>
+    internal static bool IsSkill(ToolItem? tool) => tool != null && tool.Type == ToolItemType.Skill;
+
     /// <summary>织针束缚下的伤害（照前作 BossSequenceController.BoundNailDamage）。</summary>
     internal static int NeedleDamage(int raw)
     {
@@ -120,6 +127,11 @@ internal static class Bindings
             if (hero != null)
             {
                 hero.RefreshSilk();
+            }
+            SilkSpool? spool = SilkSpool.Instance;
+            if (spool != null)
+            {
+                spool.DrawSpool();
             }
             // HUD 的面具（前作的 GGCheckBoundHeart 在面具的 FSM 里）：前作套束缚时广播这个事件让它们重新检查。
             // 不广播 HUD IN（Boss 开场演出藏着 HUD 时会被叫出来）；血量的显示由调用方随后的回满血刷新。
@@ -204,9 +216,9 @@ internal static class BindMaskValuePatch
 [HarmonyPatch(typeof(ToolItemManager), nameof(ToolItemManager.IsToolEquipped), new[] { typeof(ToolItem), typeof(ToolEquippedReadSource) })]
 internal static class BindToolsPatch
 {
-    private static bool Prefix(ref bool __result)
+    private static bool Prefix(ToolItem tool, ref bool __result)
     {
-        if (Bindings.Has(Binding.Tools))
+        if (Bindings.Has(Binding.Tools) && !Bindings.IsSkill(tool))
         {
             __result = false;
             return false;
@@ -218,9 +230,9 @@ internal static class BindToolsPatch
 [HarmonyPatch(typeof(ToolItemManager), nameof(ToolItemManager.IsToolEquipped), new[] { typeof(string) })]
 internal static class BindToolsByNamePatch
 {
-    private static bool Prefix(ref bool __result)
+    private static bool Prefix(string name, ref bool __result)
     {
-        if (Bindings.Has(Binding.Tools))
+        if (Bindings.Has(Binding.Tools) && !Bindings.IsSkill(ToolItemManager.GetToolByName(name)))
         {
             __result = false;
             return false;
@@ -241,7 +253,7 @@ internal static class BindAttackToolPatch
 {
     private static void Postfix(ref ToolItem __result)
     {
-        if (Bindings.Has(Binding.Tools))
+        if (Bindings.Has(Binding.Tools) && !Bindings.IsSkill(__result))
         {
             __result = null!;
         }

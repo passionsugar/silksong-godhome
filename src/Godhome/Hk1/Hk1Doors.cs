@@ -133,7 +133,64 @@ internal static class Hk1Doors
         if (host != null && byDoor.Count > 0)
         {
             host.StartCoroutine(SanctumArt.Load(new[] { "inventory", "ui", "achievement_icons_hornet", "crest", "core_glows" }, () => Hk1Lobby.InHub));
+            host.StartCoroutine(DressBindingCaps(scene));
         }
+    }
+
+    /// <summary>门顶四个束缚图标的物体名（Binding Caps 下面；全束缚通关时 All Bound 下面是同名的大图），顺序同 PantheonMenu.Icons。</summary>
+    private static readonly string[] CapNames = { "BindingCap_Nail", "BindingCap_Heart", "BindingCap_Charm", "BindingCap_Soul" };
+
+    /// <summary>
+    /// 门顶的束缚图标（打完套着某个束缚时亮起来的那四个）换成本作的织针、面具、工具、丝轴（0.10.6 实测清单第 11 条：还是前作的骨钉、外壳、护符、灵魂）。
+    /// 门本身、门顶的完成标记照旧是前作的。图集是 OnArrive 异步借的，到了再换（最多等 10 秒）；按前作那张图的大小缩放（保持比例、中心不动）。
+    /// 结构是离线读前作 GG_Atrium 核实的：GG_Challenge_Door (1)/Binding Caps/BindingCap_Nail 等，All Bound 下面四张大图。
+    /// </summary>
+    private static IEnumerator DressBindingCaps(string scene)
+    {
+        float until = Time.unscaledTime + 10f;
+        while (Time.unscaledTime < until && Hk1Lobby.InHub && !PantheonMenu.Icons.All(i => SanctumArt.Has(i.Atlas)))
+        {
+            yield return null;
+        }
+        Scene s = SceneManager.GetSceneByName(scene);
+        if (!Hk1Lobby.InHub || !s.IsValid() || !s.isLoaded)
+        {
+            yield break;
+        }
+        int n = 0, missing = 0;
+        foreach (BossSequenceDoor door in s.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<BossSequenceDoor>(true)))
+        {
+            Transform? caps = door.transform.Find("Binding Caps");
+            if (caps == null)
+            {
+                continue;
+            }
+            foreach (SpriteRenderer sr in caps.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                int k = Array.IndexOf(CapNames, sr.name);
+                Sprite? icon = k >= 0 ? SanctumArt.Get(PantheonMenu.Icons[k].Atlas, PantheonMenu.Icons[k].Sprite) : null;
+                if (k < 0 || sr.sprite == null || sr.sprite == icon)
+                {
+                    continue;
+                }
+                if (icon == null)
+                {
+                    missing++;
+                    continue;
+                }
+                Bounds was = sr.sprite.bounds, now = icon.bounds;
+                float f = Mathf.Min(was.size.x / now.size.x, was.size.y / now.size.y);
+                Transform t = sr.transform;
+                Vector3 oldScale = t.localScale;
+                Vector3 newScale = new Vector3(oldScale.x * f, oldScale.y * f, oldScale.z);
+                // 两张图的轴心不一样：让图的中心留在原处（父物体空间里，图的中心 = 位置 + 缩放 × 精灵里的中心）。
+                t.localPosition += Vector3.Scale(oldScale, was.center) - Vector3.Scale(newScale, now.center);
+                t.localScale = newScale;
+                sr.sprite = icon;
+                n++;
+            }
+        }
+        GodhomePlugin.Log.LogInfo($"[Godhome] 前作万神殿门上的束缚图标换成本作的 / hk1 door binding caps dressed: {scene} {n} 张 / sprites" + (missing > 0 ? $"，缺图 / missing {missing}" : ""));
     }
 
     /// <summary>门的完成情况（照前作 BossSequenceDoor.Completion），从我们的记录来。</summary>

@@ -2,6 +2,46 @@
 
 Newest first. Release archives and full notes: https://github.com/passionsugar/silksong-godhome/releases
 
+## 0.10.7 (2026-11-27)
+
+Fixes and changes from player testing, update recommended. Saves need no changes.
+
+Hall of Gods (Hollow Knight Godhome):
+
+- **Every boss has its own statue.** Seven pairs of unrelated bosses shared a statue, so its lever switched one boss into another. They are split up: the hall now has 43 statues, seven of them copies of Hollow Knight statues placed in empty spots. A lever only switches between forms of the same boss.
+- **Levers on every boss with more than one form,** and none on single-form bosses.
+- **Single-form statues show one plaque** instead of two.
+- **The red glow beside the pedestal** is lit only for the second and later forms, and fades in and out when you switch, as in Hollow Knight.
+- **Statue sizes follow the bosses' real sizes** on one common scale. Very tall or wide ones are capped to fit the hall.
+- **Statues stay on their pedestals** while the lever lowers and raises them, and no longer jump back before the next form rises.
+- **No input after falling out of the map.** If Hornet takes no input for 2 seconds while nothing (cutscene, menu, bench) has taken control, control is restored, the same as pausing and resuming.
+
+Pantheons:
+
+- **Silk skills are no longer blocked by the tool binding,** like spells under Hollow Knight's charm binding.
+- **The spool binding redraws the silk spool** at its bound length, so the remaining capacity is visible.
+- **Mask binding raised from 4 to 5 masks.** Many Silksong attacks deal two.
+- **The binding icons on the pantheon doors** are Silksong's needle, mask, tool and spool icons instead of Hollow Knight's.
+
+修复和调整版本，建议更新，存档不用动。
+
+手办屋（前作神居）：
+
+- **每个 Boss 有自己的雕像**：以前有 7 对不相干的 Boss 共用一尊雕像，推杆会把一个 Boss 换成另一个。现在全部拆开，手办屋共 43 尊，其中 7 尊照前作的雕像复制，放在空位上。推杆只切换同一个 Boss 的不同形态。
+- **有多个形态的 Boss 都有推杆**，只有一个形态的没有。
+- **单形态的雕像只摆一块牌子**，不再是两块。
+- **底座旁的红色光晕**只在第二及以后的形态亮，切换时淡入淡出，和前作一样。
+- **雕像按 Boss 的真实大小**、统一比例；特别高或特别宽的压到放得下。
+- **推杆升降时雕像不再偏离底座**，下次切换也不会先瞬移回原位。
+- **掉出地图后动不了**：没有演出、菜单、长椅等占用控制，却 2 秒不接输入时，自动恢复操作（和暂停再继续一样）。
+
+万神殿：
+
+- **工具束缚不再挡丝技**，和前作护符束缚不挡法术一样。
+- **灵丝束缚时丝轴按受限后的长度重画**，看得清实际容量。
+- **面具束缚从 4 格改为 5 格**：丝之歌里一次扣两格的攻击很多。
+- **万神殿门上的束缚图标**换成丝之歌的织针、面具、工具、丝轴。
+
 ## 0.10.6 (2026-11-27)
 
 Fixes from player reports, update recommended. Saves need no changes.

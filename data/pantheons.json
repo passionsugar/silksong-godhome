@@ -1,10 +1,10 @@
 {
-  "$comment": "[Godhome] 万神殿（照前作神居的五个万神殿）。bosses 是 data/bosses.json 里的 id，按出场顺序；rests 是“打完第几个以后去休息点”（从 1 数）；requires 是要先完成的万神殿。名字、说明是我们自己写的，不用前作的文字。束缚参数照前作 BossSequence（骨钉封顶 13、已经低于封顶打八折；最多 4 格血），丝之歌没有灵魂，用丝上限 9 代替（刚够一次缚丝回血）。",
+  "$comment": "[Godhome] 万神殿（照前作神居的五个万神殿）。bosses 是 data/bosses.json 里的 id，按出场顺序；rests 是“打完第几个以后去休息点”（从 1 数）；requires 是要先完成的万神殿。名字、说明是我们自己写的，不用前作的文字。束缚参数照前作 BossSequence（骨钉封顶 13、已经低于封顶打八折；最多 5 格血：前作是 4 格，丝之歌一次扣两格的攻击多，4 格满血挨两下就死，0.10.6 实测反馈改成 5），丝之歌没有灵魂，用丝上限 9 代替（刚够一次缚丝回血）。",
   "schemaVersion": 1,
   "bindings": {
     "needleCap": 13,
     "needleLowerPercent": 0.8,
-    "maxMasks": 4,
+    "maxMasks": 5,
     "maxSilk": 9
   },
   "rest": {
