@@ -1359,6 +1359,10 @@ internal sealed partial class DebugTools : MonoBehaviour
                     yield return Wait(1.5f);
                     yield return Shots.Capture(shot + "-2-start.jpg", row.Shots);
                 }
+                if (AggroChecked(b) && row.Start && mc.State == LoomState.Fight && Allowed())
+                {
+                    yield return Beating(AggroChecks(mc, b, scenes, shot, row));
+                }
                 float watch = GodhomeConfig.SelfTestWatch.Value;
                 if (watch > 0f && mc.State == LoomState.Fight)
                 {
@@ -1910,6 +1914,10 @@ internal sealed partial class DebugTools : MonoBehaviour
         string crestAtStart = PlayerData.instance.CurrentCrestID;
         string? expectCrest = null;
         int crestOk = 0, crestChecks = 0;
+        // 0.10.6：配装只在开殿和休息点变；战斗里被游戏改的（幽影倒下 AutoEquipTool 装上十字缝）不带到下一场。
+        RunGear? expectGear = null;
+        int gearOk = 0, gearChecks = 0;
+        string gearBad = "";
         int blueSet = -1;
         int blueOk = 0, blueChecks = 0;
         int heroOk = 0, heroChecks = 0;
@@ -1957,6 +1965,7 @@ internal sealed partial class DebugTools : MonoBehaviour
                 }
                 // 像玩家在长椅上那样换个纹章（第一次休息点换一次），看之后每一场都还是它。
                 expectCrest ??= SwapCrestForTest();
+                expectGear = RunGear.Copy(PlayerData.instance);
                 mc.DebugLeaveRest();
                 yield return WaitFor(() => mc.State is LoomState.Fight or LoomState.Lobby || !Allowed(), timeout + 30f);
             }
@@ -1999,6 +2008,23 @@ internal sealed partial class DebugTools : MonoBehaviour
                     carryOk++;
                 }
                 row.Note = $"带过来的血 / carried hp {pd.health}（上一场结束 / end of last {carried}）";
+            }
+            if (i == 0)
+            {
+                expectGear = RunGear.Copy(pd);
+            }
+            else if (expectGear != null)
+            {
+                gearChecks++;
+                if (!expectGear.Differs(pd))
+                {
+                    gearOk++;
+                }
+                else
+                {
+                    gearBad += (gearBad.Length > 0 ? "，" : "") + b.Id;
+                    row.Note += (row.Note.Length > 0 ? "; " : "") + "配装和开殿 / 休息点时的不一样 / loadout differs from the run start / rest stop";
+                }
             }
             if (expectCrest != null)
             {
@@ -2159,6 +2185,11 @@ internal sealed partial class DebugTools : MonoBehaviour
         {
             Check("休息点换的纹章带到之后各场 / crest from the rest stop kept", crestOk == crestChecks, $"{expectCrest}：{crestOk}/{crestChecks}");
         }
+        if (gearChecks > 0)
+        {
+            Check("配装只在开殿、休息点变 / loadout only changes at the start and rest stops", gearOk == gearChecks,
+                $"{gearOk}/{gearChecks}{(gearBad.Length > 0 ? "，不一样的 / differs at " + gearBad : "")}");
+        }
         if (blueChecks > 0)
         {
             Check("蓝血带到下一场 / blue health carried", blueOk == blueChecks, $"{blueOk}/{blueChecks}");
@@ -2166,6 +2197,13 @@ internal sealed partial class DebugTools : MonoBehaviour
         if (heroChecks > 0)
         {
             Check("每场进场时主角状态正常 / hero state normal at each fight", heroOk == heroChecks, $"{heroOk}/{heroChecks}");
+        }
+        if (abort == null && p.Bosses.Count > 0)
+        {
+            // 从门直接进的第一场上面那项不查（i > 0）。前作的门转场前设了“进场不接输入”，0.10.6 以前没清，第一场落地后一直动不了。
+            float first = ArrivalWatch.ControlAfter(p.Bosses[0].Id);
+            Check("第一场落地后能操作 / control at the first fight", first >= 0f,
+                $"{p.Bosses[0].Id}：落地后 / after landing {(float.IsNaN(first) ? "没记到 / not measured" : first >= 0f ? first.ToString("0.00") + " 秒 / s" : $"{ArrivalWatch.Window:0} 秒内一直没有 / none within {ArrivalWatch.Window:0} s")}");
         }
 
         // 4. 回到门前：结算（完成时）、记录、束缚解开。

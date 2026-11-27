@@ -416,6 +416,17 @@ internal static class SaveGuard
 
     private static bool warnedCompare;
 
+    /// <summary>用游戏的序列化器深拷贝一份存档子数据（例如 ToolCrestsData）：之后游戏原地改原对象，拷贝不跟着变。</summary>
+    internal static T? Clone<T>(T? o) where T : class
+    {
+        if (o == null)
+        {
+            return null;
+        }
+        JsonSerializer ser = Serializer();
+        return JToken.FromObject(o, ser).ToObject<T>(ser);
+    }
+
     private static int CopyContract(JsonSerializer ser, object src, object dst)
     {
         if (ser.ContractResolver.ResolveContract(src.GetType()) is not JsonObjectContract contract)

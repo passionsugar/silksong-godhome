@@ -36,6 +36,9 @@ internal static class ArrivalWatch
     /// <summary>这次落地后人拿到过操作没有（每帧看一次，挨打时也看）。</summary>
     private static bool hadControl;
 
+    /// <summary>落地（FinishedEnteringScene）时离最近一次淡入多少秒；落地后多少秒第一次能操作（-1 = 窗口里一直没有）。</summary>
+    private static float sinceFade, controlAfter;
+
     /// <summary>
     /// 这次自检里进场挨过打的场次（自检结束时汇总后清掉）。自检报告也列出来（Codex 审计 0.10.3 第 6.4 节：
     /// 以前只写日志，报告里照样“全部通过”）。“恢复操作前”的伤害玩家躲不开，是落点要改；之后的是正常交战，只作参考。
@@ -49,6 +52,12 @@ internal static class ArrivalWatch
     internal static IReadOnlyList<string> Flagged => flagged;
 
     internal static int FlaggedBeforeControl => flaggedBefore;
+
+    /// <summary>这次自检里各场落地后多少秒能操作（-1 = 窗口里一直没有；同一个 Boss 只记第一次）。万神殿自检看第一场。</summary>
+    private static readonly Dictionary<string, float> controlTimes = new();
+
+    /// <summary>这个 Boss 落地后多少秒能操作（-1 = 窗口里一直没有，NaN = 没记到）。</summary>
+    internal static float ControlAfter(string id) => controlTimes.TryGetValue(id, out float t) ? t : float.NaN;
 
     internal static bool Watching => watched >= 0f && watched <= Window;
 
@@ -65,6 +74,9 @@ internal static class ArrivalWatch
         hits.Clear();
         beforeControl = 0;
         hadControl = false;
+        // 原转场带的入场等待（SceneLoadInfo.EntryDelay）在淡入以后、落地之前（HeroController.EnterHeroSubFadeUp）：人看得见却动不了。
+        sinceFade = FadeSceneInTrace.Last >= 0f ? Time.unscaledTime - FadeSceneInTrace.Last : -1f;
+        controlAfter = -1f;
         watched = 0f;
         int mine = ++serial;
         string near = NearestBoss(b, at);
@@ -186,6 +198,10 @@ internal static class ArrivalWatch
             {
                 hadControl = true;
             }
+            if (hadControl && controlAfter < 0f)
+            {
+                controlAfter = watched;
+            }
         }
         if (mine != serial)
         {
@@ -196,7 +212,17 @@ internal static class ArrivalWatch
             ? "没碰到伤害 / no damage"
             : $"碰到伤害 {hits.Count} 次（恢复操作前 {beforeControl} 次）/ {hits.Count} damage calls ({beforeControl} before control)："
                 + string.Join("；", hits.GroupBy(h => h).Select(g => g.Count() > 1 ? $"{g.Key} ×{g.Count()}" : g.Key).Take(8));
-        string line = $"[Godhome] 进场检查 / arrival check {boss}：落点 / landed ({landed.x:0.0}, {landed.y:0.0})，最近的 Boss / nearest boss {near}；{Window:0} 秒内 / within {Window:0} s {summary}";
+        string timing = $"淡入后 / after fade-in {(sinceFade >= 0f ? sinceFade.ToString("0.00") : "-")} 秒落地 / s to land，落地后 / after landing {(controlAfter >= 0f ? controlAfter.ToString("0.00") : "-")} 秒能操作 / s to control";
+        if (controlAfter < 0f && HeroController.SilentInstance is HeroController hh)
+        {
+            // 一直没恢复操作：记下卡在哪个标志上。
+            timing += $"（窗口结束时 / at the end: input={hh.acceptingInput} relinquished={hh.controlReqlinquished} transition={hh.transitionState} enterWithoutInput={hh.enterWithoutInput} blocked={hh.IsInputBlocked()}）";
+        }
+        if (!controlTimes.ContainsKey(boss))
+        {
+            controlTimes[boss] = controlAfter;
+        }
+        string line = $"[Godhome] 进场检查 / arrival check {boss}：落点 / landed ({landed.x:0.0}, {landed.y:0.0})，最近的 Boss / nearest boss {near}；{timing}；{Window:0} 秒内 / within {Window:0} s {summary}";
         if (hits.Count == 0)
         {
             GodhomePlugin.Log.LogInfo(line);
@@ -277,6 +303,7 @@ internal static class ArrivalWatch
     {
         flagged.Clear();
         flaggedBefore = 0;
+        controlTimes.Clear();
     }
 
     /// <summary>离落点最近的 Boss 物体（表里的 bossObjects）：碰撞体最近点的距离，物体关着的也列（标“关”）。</summary>

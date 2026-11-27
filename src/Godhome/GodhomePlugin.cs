@@ -63,7 +63,7 @@ public partial class GodhomePlugin : BaseUnityPlugin, ISaveDataMod<GodhomeSaveDa
     /// 游戏更新后这些目标变了也不会连累别的补丁。</summary>
     private static readonly HashSet<string> DebugOnlyPatches = new(StringComparer.Ordinal)
     {
-        nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace), nameof(ArrivalDamagePatch),
+        nameof(PuppetPatch), nameof(PromoAspectPatch), nameof(FadeSceneInTrace), nameof(ArrivalDamagePatch), nameof(TopGateTrace),
     };
 
     /// <summary>

@@ -2351,7 +2351,7 @@
         "scene": "Clover_10"
       },
       "arena": {
-        "$comment": "门放进 Enter Detector（x 83.8–92.7，y 36–50）；Dancer Control 在 Dormant 等 BATTLE START。",
+        "$comment": "门放进 Enter Detector（x 83.8–92.7，y 36–50）；Dancer Control 在 Dormant 等 BATTLE START。两段：一段血量归零（ZERO HP → Stun Stagger）只是硬直，Dancer Control 的 Dancers Stunned 看 Phase，第一段走 Phase Check → Set Phase 2 回满血接着打；第二段发 DEATH → Dancer Death 给被打倒的那只发 DIE → Death Stagger → 翠庭版走 Green Prince Death（另一只 FADE AWAY、自己 InstaDeath）。以前按 Stun Stagger 判胜，一段打完就算赢（0.10.5 玩家报“第一阶段打完就下一个了”），改按 Green Prince Death。",
         "door": [
           85.0,
           39.5
@@ -2366,12 +2366,12 @@
           {
             "path": "Boss Scene/Dancer Control/Dancer A",
             "fsm": "Control",
-            "state": "Stun Stagger"
+            "state": "Green Prince Death"
           },
           {
             "path": "Boss Scene/Dancer Control/Dancer B",
             "fsm": "Control",
-            "state": "Stun Stagger"
+            "state": "Green Prince Death"
           }
         ]
       },
@@ -3469,7 +3469,7 @@
         "scene": "Bone_East_08"
       },
       "arena": {
-        "$comment": "$Rematch 默认为真，Rematch Ready 等 Wake Range，落点就在里面，只停一帧。宿主场景 Bone_East_08 的 Boss Scene 是第四圣咏团的战斗，defeatedSongGolem 为假会在 Start Range 被唤醒（开墙、镜头锁），所以前置条件设 defeatedSongGolem=true，让它走 Defeated 分支。重打版（Rematch）每次选招（Choice）和踩地前（Stomp Pos）看人在不在 Arena Range（Rematch Ready 时从它身上摘下来的范围，x 66.1–96.3、y -2.8–32.1）里，不在就 GO HOME → Buzz To Home 飞回家、等人回到范围里才接着打（原版这场不锁人，人走开它就回家）。神居里人跑到范围边上它就不打了（0.10.1 玩家报“中途丢失仇恨”），所以两处 GO HOME 都改接 Charge Pos：人不在范围里就飞过去冲。",
+        "$comment": "$Rematch 默认为真，Rematch Ready 等 Wake Range，落点就在里面，只停一帧。宿主场景 Bone_East_08 的 Boss Scene 是第四圣咏团的战斗，defeatedSongGolem 为假会在 Start Range 被唤醒（开墙、镜头锁），所以前置条件设 defeatedSongGolem=true，让它走 Defeated 分支。重打版（Rematch）每次选招（Choice）和踩地前（Stomp Pos）看人在不在 Arena Range（Rematch Ready 时从它身上摘下来的范围，x 66.1–96.3、y -2.8–32.1）里，不在就 GO HOME → Buzz To Home 飞回家、等人回到范围里才接着打（原版这场不锁人，人走开它就回家）。神居里人跑到范围边上它就不打了（0.10.1 玩家报“中途丢失仇恨”），所以两处 GO HOME 都改接 Charge Pos：人不在范围里就飞过去冲。0.10.6：Rematch Ready 里 CheckAlertRangeByName(Wake Range → BATTLE START) 排在一串初始化动作中间，落点在 Wake Range 里，进状态当帧就跳走，后面的 Final Slam=1、Low Y Point=9.6、High Y Pos=14、Enemy Remaining Max=1、SetParent(Arena Range, null) 都没执行（FsmState.ActivateActions 见 IsSwitchingState 就返回）：Choice 每次都走 DOOR SLAM，只在原高度来回撞墙、在墙边停（玩家报“飞到一边停着不打”，第九轮没找到这个）；Arena Range 也一直挂在 Boss 身上跟着跑（自检量到 x 77.8–112.6）。用 actionLast 把这个检查挪到最后。",
         "door": [
           81.0,
           15.8
@@ -3496,6 +3496,14 @@
             "from": "Stomp Pos",
             "event": "GO HOME",
             "to": "Charge Pos"
+          },
+          {
+            "type": "actionLast",
+            "path": "Boss Scene Beastfly/Beastfly States/Active/Bone Flyer Giant",
+            "fsm": "Control",
+            "state": "Rematch Ready",
+            "name": "CheckAlertRangeByName",
+            "required": true
           }
         ]
       },

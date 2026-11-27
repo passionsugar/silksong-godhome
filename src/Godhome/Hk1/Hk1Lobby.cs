@@ -200,8 +200,14 @@ internal static class Hk1Lobby
         HeroController hero = HeroController.SilentInstance;
         if (hero != null)
         {
+            // 前作挑战门的 Change Scene 在 BeginSceneTransition 之前给主角发 SendMessage，等前作 GG_Boss_Door_Entrance 的演出再交还。
+            // 我们改道进本作的战场，没有那段演出：留着“进场不接输入”的话 FinishedEnteringScene 不调 AcceptInput，第一场落地后一直动不了
+            // （玩家报“每个万神殿第一场开始时动不了一会儿”；0.10.6 p2 自检：幽影一场落地后 8 秒都没恢复操作）。
+            string before = $"enterWithoutInput={hero.enterWithoutInput} relinquished={hero.controlReqlinquished} input={hero.acceptingInput} anim={hero.HasAnimationControl}";
+            hero.EnterWithoutInput(false);
             hero.RegainControl();
             hero.StartAnimationControl();
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作 FSM 拿走的操作还回来 / hk1 FSM control handed back: {before} → enterWithoutInput={hero.enterWithoutInput} relinquished={hero.controlReqlinquished} input={hero.acceptingInput}");
         }
     }
 
@@ -297,14 +303,22 @@ internal static class Hk1Lobby
     ///   不关的话雕像前、门前多一个“交谈”，按上会从回程门“进门”，没有目标场景，被改道送回前厅。
     /// - 去没搬过来的房间的门（屋顶的风暴之地、前厅的蓝色房间）：丝之歌查不到目标就把人送回这扇门，等于原地重进一次房间，也关掉（Codex 审查）。
     /// - 剩下的真门（前厅去手办屋的 Door_Workshop）：照前作是“进入”。
+    /// - 层：前作前厅去屋顶的 top1、top2 在第 10 层（前作的 TRANSITION_GATES），丝之歌没有这一层，主角（第 9 层）和它不碰，
+    ///   跳进去收不到触发、不切场景（玩家报“五门那里好像是上去了但没有切场景”；0.10.6 巡视：碰不碰 False、出口收到的调用 0）。
+    ///   丝之歌的转场点和前作别的门都在第 13 层（HERO_DETECTOR，离线读两边的场景核实），改过去。
     /// </summary>
     internal static void FixDoors(string sceneName, GameObject[] roots)
     {
-        List<string> exits = new(), quiet = new(), enter = new();
+        List<string> exits = new(), quiet = new(), enter = new(), relayered = new();
         foreach (TransitionPoint tp in roots.SelectMany(r => r.GetComponentsInChildren<TransitionPoint>(true)))
         {
             string target = tp.targetScene;
             exits.Add($"{tp.name}→{(string.IsNullOrEmpty(target) ? "-" : target)}{(tp.isADoor ? "(door)" : "")}{(tp.isInactive ? "(inactive)" : "")}");
+            if (tp.gameObject.layer == Hk1TransitionGates)
+            {
+                tp.gameObject.layer = (int)GlobalEnums.PhysLayers.HERO_DETECTOR;
+                relayered.Add(tp.name);
+            }
             // 标签一律先改好（旧字段清掉，之后醒来的也不会再升级成“交谈”）。
             OldPromptLabel(tp) = null!;
             LabelField(tp) = InteractableBase.PromptLabels.Enter;
@@ -330,8 +344,12 @@ internal static class Hk1Lobby
             quiet.Add(tp.name);
         }
         GodhomePlugin.Log.LogInfo($"[Godhome] 前作场景的门 / hk1 doors: {sceneName}：{string.Join("，", exits)}；"
-            + $"关掉交互 / made non-interactive: {(quiet.Count == 0 ? "-" : string.Join("，", quiet))}；进入 / enter: {(enter.Count == 0 ? "-" : string.Join("，", enter))}");
+            + $"关掉交互 / made non-interactive: {(quiet.Count == 0 ? "-" : string.Join("，", quiet))}；进入 / enter: {(enter.Count == 0 ? "-" : string.Join("，", enter))}"
+            + $"；第 10 层改到第 13 层 / moved from layer 10 to 13: {(relayered.Count == 0 ? "-" : string.Join("，", relayered))}");
     }
+
+    /// <summary>前作的转场层（GlobalEnums.PhysLayers.TRANSITION_GATES，丝之歌的枚举里没有）。</summary>
+    private const int Hk1TransitionGates = 10;
 
     /// <summary>
     /// 模糊背景板：丝之歌给它换上自己的屏幕空间模糊材质（LightBlurredBackground），前作的板排序值是 0，

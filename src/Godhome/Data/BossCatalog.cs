@@ -239,6 +239,7 @@ internal sealed class ArenaPatch
         "start" => $"{Path}::{Fsm} start → '{State}'",
         "goto" => $"{Path}::{Fsm} [{From}] {Event} → '{To}'",
         "var" => $"{Path}::{Fsm} {ValueType} {Name} = {Value}",
+        "actionLast" => $"{Path}::{Fsm} [{State}] {Name} → 最后 / last",
         _ => $"{Type} {Path}",
     };
 }
@@ -529,7 +530,7 @@ internal static class BossCatalog
         return a;
     }
 
-    private static readonly HashSet<string> PatchTypes = new() { "start", "goto", "var", "activate", "deactivate" };
+    private static readonly HashSet<string> PatchTypes = new() { "start", "goto", "var", "activate", "deactivate", "actionLast" };
 
     private static List<ArenaPatch> Patches(JToken? t, string id)
     {
@@ -591,6 +592,7 @@ internal static class BossCatalog
                 "goto" when p.From.Length == 0 || p.Event.Length == 0 || p.To.Length == 0 => "goto 要写 from、event、to",
                 "var" when valueBad != null => valueBad,
                 "var" when p.Name.Length == 0 || p.ValueType.Length == 0 => "var 要写 name 和 bool / int / float / string 之一",
+                "actionLast" when p.State.Length == 0 || p.Name.Length == 0 => "actionLast 要写 state 和 name（动作的类型名）",
                 _ => null,
             };
             if (bad != null)

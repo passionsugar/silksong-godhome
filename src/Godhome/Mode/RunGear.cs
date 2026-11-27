@@ -31,6 +31,19 @@ internal sealed class RunGear
         extra = pd.ExtraToolEquips,
     };
 
+    /// <summary>
+    /// 记下一份深拷贝（每场开战时）。战斗里游戏会原地改 pd.ToolEquips（例如幽影倒下时 UI Msg 的 AutoEquipTool 把十字缝装上，
+    /// ToolItemManager.AutoEquip），只拿引用的话记下的也跟着变。
+    /// </summary>
+    internal static RunGear Copy(PlayerData pd) => new()
+    {
+        crest = pd.CurrentCrestID,
+        prevCrest = pd.PreviousCrestID,
+        crestTemp = pd.IsCurrentCrestTemp,
+        equips = SaveGuard.Clone(pd.ToolEquips),
+        extra = SaveGuard.Clone(pd.ExtraToolEquips),
+    };
+
     /// <summary>和 pd 里现在的配装（刚拷回的快照）比：纹章或者任何一个槽位不一样就是 true。比不出来（序列化出错）也当作不一样。</summary>
     internal bool Differs(PlayerData pd)
         => crest != pd.CurrentCrestID || prevCrest != pd.PreviousCrestID

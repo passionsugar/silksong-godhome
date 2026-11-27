@@ -49,9 +49,16 @@ internal static class Hk1Doors
     /// <summary>屋顶那扇门（前作万神殿的第五扇）的物体名。</summary>
     internal const string FinalDoor = "GG_Final_Challenge_Door";
 
+    /// <summary>调试（前作巡视期间）：前厅当第五扇门已经开了（照玩家一到四门都通关的样子），去屋顶的出口 top2 才在，走玩家上屋顶那条路。</summary>
+    internal static bool DebugFinalOpen { get; set; }
+
     /// <summary>这扇门（按物体名）接的万神殿开了没有（没接上的门当没开）。</summary>
     internal static bool Unlocked(string doorName)
     {
+        if (DebugFinalOpen && doorName == FinalDoor)
+        {
+            return true;
+        }
         PantheonDef? p = doors.TryGetValue(doorName, out string? id) ? PantheonCatalog.Find(id) : null;
         return p != null && ModeController.PantheonUnlocked(p);
     }

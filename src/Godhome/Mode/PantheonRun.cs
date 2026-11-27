@@ -9,6 +9,7 @@ namespace Godhome;
 /// - 血、丝：不经过休息点时带（去休息点在长椅回满）；
 /// - 蓝血（PlayerData.healthBlue）：一直带，用掉的不补回来、途中得到的不丢（Codex 审计 0.10.3 F04）；长椅照游戏的规矩清掉；
 /// - 配装（纹章、装着的工具，见 RunGear）：一直带，休息点长椅上换的管到这次连战结束（F03）。
+///   带的是每场开战时的配装（FightGear）：战斗里玩家换不了配装，变了的是游戏自己改的（幽影倒下自动装上十字缝），不带。
 /// 工具的剩余次数、临时状态不带：每场回到开殿时的样子。
 /// </summary>
 internal sealed class PantheonRun
@@ -43,6 +44,9 @@ internal sealed class PantheonRun
     /// GameManager.EnteredNewMapZone 会 MaxHealthKeepBlue 回满血（Codex 审查 0.8.0），场景加载完才发生，比我们换场时设的值晚。
     /// </summary>
     internal (int Hp, int Silk, int Blue)? Carry { get; set; }
+
+    /// <summary>这一场开战时身上的配装（深拷贝，BeginBoss 记）。换下一场时带它，不带战斗里被游戏改过的。</summary>
+    internal RunGear? FightGear { get; set; }
 
     internal BossDef Current => Def.Bosses[Math.Max(0, Math.Min(Index, Def.Bosses.Count - 1))];
 

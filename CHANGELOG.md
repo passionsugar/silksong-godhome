@@ -2,6 +2,24 @@
 
 Newest first. Release archives and full notes: https://github.com/passionsugar/silksong-godhome/releases
 
+## 0.10.6 (2026-11-27)
+
+Fixes from player reports, update recommended. Saves need no changes.
+
+- **Frozen at the start of each pantheon's first fight.** The Hollow Knight challenge door tells Hornet to enter the next room without input, and Hollow Knight hands control back in a cutscene that Godhome skips. You now have control as soon as you land.
+- **Cross Stitch equipped by itself after Phantom.** Phantom's defeat grants the parry and equips Cross Stitch; in a pantheon that loadout carried into every later fight. Loadout changes the game makes during a fight are no longer carried over. Changes you make at a rest bench still are.
+- **Clover Dancers ended after the first phase.** The win now waits for the second phase.
+- **Savage Beastfly (Far Fields rematch) hovering at the side without attacking.** The entry point is inside its wake range, which cut its opening setup short. It now finishes the setup and chases you.
+- **Roof of the Hollow Knight Godhome.** Once the first four pantheons are done, strike the lever above the fifth door to open the leaves, as in Hollow Knight. The exits to and from the roof were on a physics layer that Silksong's Hornet never touches, so jumping in did nothing. They work now.
+
+修复版本，建议更新，存档不用动。
+
+- **每个万神殿第一场开始时动不了**：前作的挑战门让大黄蜂“不接输入地进下一个房间”，前作靠一段演出交还操作，神居跳过了那段演出。现在落地就能操作。
+- **打完幽影自动装上十字缝**：幽影倒下时游戏给了弹反、自动装上十字缝，万神殿里这套配装一直带到后面各场。现在战斗中游戏自己改的配装不带到下一场；休息点长椅上自己换的照旧带。
+- **三叶草舞者第一阶段打完就判胜**：现在要等第二阶段打完。
+- **残暴的兽蝇（远野再临）飞到一边停着不打**：入场点在它的开战范围里，开场设置没做完就开打了。现在设置做完、会追着人打。
+- **前作神居的屋顶**：前四个万神殿完成后，照前作用骨钉敲第五扇门上方的拉杆，打开叶子。去屋顶和从屋顶回来的出口原来在丝之歌的大黄蜂碰不到的物理层上，跳进去没反应，现在能用了。
+
 ## 0.10.5 (2026-11-27)
 
 Bug fixes, update recommended. Saves need no changes.

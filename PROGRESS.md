@@ -1361,6 +1361,57 @@
 - 关调试启动（03:12、03:18 两次）：`Godhome 0.10.5 loaded … debug = False`，Steam 登录、读语言、前作场景包“已是最新”，停在标题画面，没有异常。
   截屏失败（测试机桌面会话断开），改看窗口列表：游戏窗口在最前，没有 Steam 弹窗。
 - 收尾：槽 3 换回参考存档（25 个文件，0 处不同），槽 1、2、4 的 34 个文件和基线一致，配置文件哈希复原。
+- 发布包（9bb615a9 构建，SHA-256 `B0B01C08…FBF8`，378204 字节，包里加了 CHANGELOG.md）用包里的安装器装上，单打丝母、双苔母 2/2：
+  双苔母落点 (4.30, 20.57) 在开战触发区里、危险复活回原点（血 10→9）、死亡回大厅、重试落点差 0.00；丝母 terminal 判胜、落地检查过；资源 6/6。截图看过：双苔母站在场内左边地面，危险复活同一位置，丝母打完在前作大厅站在地上。之后又跑一次收尾，槽 1、2、4 不变。
+- `BossCatalog.cs`、`GodhomeSave.cs` 合入 PR 后成了混合换行（GPT 加的行是 CRLF），公开仓库这两份一直是 CRLF，统一成 CRLF（cdf21dc8，只改换行）。
+- **发布**：
+  - 公开仓库在 PR 分支上加一个提交（875abb4，passionsugar，导出 cdf21dc8），快进推到 `fix/v0.10.5-hotfix`，没改写 GPT 的提交；相对 main 25 个文件、+2218/−42。
+  - `.github/workflows/thunderstore.yml` 没推上去：测试机 gh 的令牌没有 `workflow` 权限，GitHub 拒收。公开版先不带它（打包脚本、toml、README 带上了），工作流文件只在私有仓库。
+  - PR #1 改了标题、说明，转为正式，squash 合并进 main（b9dac0a6）。合并提交的作者是 GitHub 账号的提交邮箱（不是以前的 noreply），已经公开；改写要强推 main，没做，等你决定。
+  - Release v0.10.5（Latest，tag 在 b9dac0a6），附件下载回来 SHA 一致。
+  - Thunderstore 没上传。
+
+### 第十二轮：玩家报的五个问题、0.10.6 开发版（2026-11-27，Devin 接手）
+
+接手的是 Devin（Claude 额度用完期间），交还说明在 `<工作目录>\handoff\back-to-claude.md`。
+
+你的要求（原话，没有标点）：
+> 怎么二门打完幽影自动装弹反了之前没这个问题的然后现在每个门开始的时候会动不了一小段时间二见兽蝇丢仇恨的问题还在三叶草舞者第一阶段打完就下一个了见不到二阶段用前作的场景五门那里上不去好像是上去了但没有切场景
+
+追问后：动不了是“进每个万神殿的第一场”；兽蝇是“飞到一边停着不打”；五门是“一到四门都通了，跳上去不切”；日志在别的电脑上，之后给。
+
+提交（d87c30de 之后）：1a65b248、15b8045e、b657e5bb（提交说明是乱码，原文补在 276824b3 的说明里）、276824b3、b139d2c7、4e353f8a、9569abe2。版本号 0.10.6，只在私有仓库和测试游戏里，没有发布。
+
+#### 改了什么、原因
+
+- **三叶草舞者一段就判胜**：`bosses.json` 的结束点原来是 Dancer A/B 的 `Stun Stagger`，那是第一阶段血空进的硬直（`Dancer Control` 的 `Dancers Stunned` 在 Phase 1 走 `Set Phase 2` 回满血）。改成两只的 `Green Prince Death`（第二阶段才走到）。
+- **二见兽蝇停在一边不打**：第九轮只改了 `Choice`、`Stomp Pos` 的 `GO HOME`，没找到根上。神居的落点本来就在 `Wake Range` 里，重打版 `Rematch Ready` 里的 `CheckAlertRangeByName` 当帧发 `BATTLE START` 跳走；PlayMaker 一切状态，同状态后面的动作就不执行，于是开场设置（把 `Arena Range` 从 Boss 身上摘下来等）没做，“人在不在场地里”的范围跟着 Boss 跑。表补丁加 `actionLast`（`Arena.cs`），把它挪到这个状态最后。
+- **二门打完幽影自动装上十字缝**：幽影判胜点 `UI Msg` 里有 `AutoEquipTool(十字缝)`，游戏自己给装上；0.10.4 起万神殿换场时保留身上的配装（`RunGear`，Codex 审计 F03），连这个也带到了后面各场。改成开战时记下配装（`PantheonRun.FightGear`），战斗里被游戏改了就按开战时的带；休息点长椅上自己换的照旧保留。
+- **每个万神殿第一场动不了**：前作挑战门 `Challenge UI` FSM 的 `Change Scene` 在 `BeginSceneTransition` 之前给主角发 `SendMessage`，设了 `enterWithoutInput`（前作靠 `GG_Boss_Door_Entrance` 的演出交还）。我们把这个转场改道进本作的第一场，`Hk1Lobby.ReleaseHero` 只 `RegainControl`，`FinishedEnteringScene` 就不 `AcceptInput`，要等 Boss 自己的开场演出交还操作；幽影开场不收放操作，所以一直动不了。`ReleaseHero` 改成先 `EnterWithoutInput(false)`。1a65b248 原来猜是 `SceneLoadInfo.EntryDelay`，实测否定，已撤回。
+- **前作五门跳上去不切场景**：两层原因。
+  - 第五扇门开了以后，前厅顶上还有一片叶子（`gg_atrium_hidden_path/top_leaves_closed`，带 `Roof` 碰撞体）挡着出口 top2。前作的开法：门顶的拉杆 `gg_roof_lever` 出来（`BossDoorTargetLock` 的 `Unlocked` 动画），用骨钉敲它才打开叶子（离线只读前作 `level424` 核实）。丝之歌的骨钉敲得动，这一层不用改。
+  - 叶子开了以后跳进 top2 还是不切：前厅的 top1、top2、屋顶的 bot1、bot2 在第 10 层（前作的 `TRANSITION_GATES`），丝之歌没有这一层，主角（第 9 层）和它不碰，触发不了。丝之歌的转场点和前作别的门都在第 13 层（`HERO_DETECTOR`，离线读两边的场景核实）。`Hk1Lobby.FixDoors` 加载时把第 10 层的转场点改到 13。屋顶回前厅的 bot1、bot2 也是同一个问题（以前巡视都是直接调转场，没走过）。
+- 调试检查（只在调试里）：万神殿自检加“配装只在开殿、休息点变”“第一场落地后能操作”（原有的“每场进场时主角状态正常”从第二场才查，所以以前没查出第一场）；进场检查记淡入后几秒落地、落地后几秒能操作；兽蝇仇恨专项（`DebugTools.Aggro.cs`）；前作巡视量第一场能操作的时间、敲屋顶拉杆（`HeroController.Attack` 真挥刀）、从下面往上跳进 top2；调试补丁 `TopGateTrace`。
+
+#### 实测（测试机，槽 3，自检、巡视都是调试辅助，不是手打）
+
+- 单打 15:35（1a65b248）：三叶草舞者两个阶段都走完，13.6 秒判胜（判定 `Dancer A::Control [Green Prince Death]`）。
+- 单打兽蝇专项 15:55（b657e5bb）：落点、场地左、右三处都冲着人出招，最近 0.8–0.9 格，30.0 秒判胜；截图 `shots\20261127_155503`。
+- p2 15:59（b657e5bb）：10/10 场，万神殿各项全过；“这一场里游戏改了配装，不带到下一场（phantom）”，配装 9/9。幽影一场落地后 8 秒都没恢复操作（修第一场之前）。
+- 前作巡视 17:35、17:53、18:11（276824b3 起）：第一场苔藓之母落地 0.04 秒能操作，淡入后 0.39–0.44 秒；`ReleaseHero` 日志 `enterWithoutInput=True → False`。屋顶拉杆敲开叶子。跳进 top2 不切（层的问题，日志“碰不碰 False”、出口收到的调用 0）。
+- 前作巡视 18:23（9569abe2）：**全部通过**。跳进 top2 收到 1 次触发、切到屋顶；屋顶 bot1、bot2 也改了层。
+- p2 18:27（9569abe2）：10/10 场，万神殿各项全过；**第一场落地后能操作：幽影 0.04 秒**（修之前 8 秒都不能），进场 8 秒内没有碰到伤害（修之前 46 次），配装 9/9。
+
+- 回归（9569abe2，插件目录只有这一份）：
+  - p1 全束缚 18:39：**10/10 场、31/31 项**（0.10.5 是 29 项，多了“配装只在开殿、休息点变”“第一场落地后能操作”）。第一场苔藓之母落地 0.06 秒能操作。进场挨打 3 场（钟道兽、巨型螺蝇、蕾丝），都在恢复操作后；0.10.5 报的黑寡妇“恢复操作前”这次没有。
+  - p5 18:45–19:04：**47/47 场、47/47 项**，用时 17:24.9。第一场苔藓之母 0.04 秒；配装 46/46、主角状态 46/46。进场挨打 13 场，都在恢复操作后（0.10.5 也是 13 场、0 场）。远野再临的兽蝇（第 27 场，补丁 `Rematch Ready` 挪到最后 ok）、三叶草舞者（第 31 场，按 `Green Prince Death` 判胜）、幽影都过。
+  - 关调试启动 19:05：`Godhome 0.10.6 loaded … debug = False`，前作场景包“已是最新”，游戏窗口在最前、没有 Steam 弹窗（会话断开，截不了屏，看窗口列表）。报错只有以前就有的 `Unable to start Unity log writer`、`Couldn't find a Game Manager / GameCameras`。
+  - p1 日志里有一条 `Cannot set the parent of the GameObject 'Home' while activating … 'Bone Circler Vicious'`，和以前珊瑚小怪、特罗比奥活板门改父物体同一类，没影响判胜。
+  - 每轮之后 t_final：槽 3 换回参考存档，槽 1/2/4 的 34 个文件没变，配置复原，锁释放。
+
+没测到的：玩家手打（自检替玩家触发、分段击杀）；你那台电脑的日志还没看到；第五扇门真的通关 p1–p4 后的样子（巡视用 `DebugFinalOpen` 当它开着）。
+
+其他：18:01 启动卡在 Steam 云冲突（只冲突槽 3 的 `Modded/user3/SaveData/local.silksong.godhome.json.dat`），按你说的处理了：把和云端一样的那份（`godhome-saves-aside\slot3-cloudrun-2026-11-27_180053`）拷回槽 3，之后启动没再弹。
 
 ## 万神殿（2026-11-23，插件 0.8.0）
 

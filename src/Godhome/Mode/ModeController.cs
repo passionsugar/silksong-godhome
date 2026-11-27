@@ -1149,6 +1149,19 @@ internal sealed class ModeController : MonoBehaviour
         }
         SetDeathRespawnToLobby();
         runFight = Run != null;
+        if (Run != null)
+        {
+            // 开战时的配装（上一场带过来的，或者休息点长椅上刚换的）。换下一场时带它（ContinueRun）。
+            try
+            {
+                Run.FightGear = RunGear.Copy(PlayerData.instance);
+            }
+            catch (Exception e)
+            {
+                Run.FightGear = null;
+                GodhomePlugin.Log.LogWarning($"[Godhome] 记开战时的配装出错，下一场按战斗结束时的带 / copying the loadout at fight start failed: {e.Message}");
+            }
+        }
         // 万神殿里用过一次调试辅助，整串都算（前作没有这个，是我们不记录辅助战绩的规则）。
         fightAssisted = Run != null && Run.Assisted;
         attemptCounted = false;
@@ -1289,6 +1302,13 @@ internal sealed class ModeController : MonoBehaviour
         int blue = pd.healthBlue;
         // 身上的配装（休息点长椅上可能换过）：拷回快照以后放回去（Codex 审计 0.10.3 F03）。
         RunGear gear = RunGear.Take(pd);
+        if (run.FightGear != null && run.FightGear.Differs(pd))
+        {
+            // 战斗里玩家换不了配装（只能在长椅上换），变了的是游戏自己改的：幽影倒下的 UI Msg 给 hasParry 并 AutoEquipTool 装上十字缝，
+            // 0.10.4 起照样带到了之后各场（玩家报“二门打完幽影自动装上弹反”）。按这一场开战时的带。
+            GodhomePlugin.Log.LogInfo($"[Godhome] 这一场里游戏改了配装，不带到下一场 / the game changed the loadout during this fight; carrying the fight-start one instead（{CurrentBoss?.Id}）");
+            gear = run.FightGear;
+        }
         bool rest = run.Def.RestAfter(run.Index) || (DebugTools.Instance != null && DebugTools.Instance.ExtraRest(run));
         try
         {

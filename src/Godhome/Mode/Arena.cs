@@ -721,6 +721,34 @@ internal static class Arena
                 t.ToFsmState = to;
                 return "ok";
             }
+            case "actionLast":
+            {
+                // 把状态里的某个动作挪到最后（name 是动作的类型名，取第一个启用的）。
+                // 用途：等进范围的检查排在一串初始化动作中间，人一落地就在范围里，进状态当帧就跳走，
+                // 后面的初始化都不执行（FsmState.ActivateActions 见 Fsm.IsSwitchingState 就返回，反编译 FsmState.cs）。
+                // 例：远野再临的兽蝇 Rematch Ready 的 CheckAlertRangeByName(Wake Range)，后面的 Final Slam、摘下 Arena Range 都没做。
+                if (!f.Initialized)
+                {
+                    f.InitData();
+                }
+                FsmState? st = f.GetState(p.State);
+                if (st == null)
+                {
+                    return Bad($"没有状态 / no state '{p.State}'");
+                }
+                int idx = Array.FindIndex(st.Actions, a => a != null && a.Enabled && a.GetType().Name == p.Name);
+                if (idx < 0)
+                {
+                    return Bad($"状态里没有启用的 / no enabled action '{p.Name}' (has: {string.Join(", ", st.Actions.Select(a => a?.GetType().Name))})");
+                }
+                if (idx == st.Actions.Length - 1)
+                {
+                    return "已经在最后 / already last";
+                }
+                FsmStateAction moved = st.Actions[idx];
+                st.Actions = st.Actions.Where((_, i) => i != idx).Concat(new[] { moved }).ToArray();
+                return $"ok（第 / from {idx + 1}/{st.Actions.Length} 挪到最后 / moved last）";
+            }
             case "var":
             {
                 FsmVariables v = f.Variables;

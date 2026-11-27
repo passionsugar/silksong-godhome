@@ -6,8 +6,12 @@ namespace Godhome;
 [HarmonyPatch(typeof(GameManager), nameof(GameManager.FadeSceneIn))]
 internal static class FadeSceneInTrace
 {
+    /// <summary>最近一次淡入的时间（unscaledTime；进场检查用它算“淡入后多久才落地”）。</summary>
+    internal static float Last = -1f;
+
     private static void Prefix(GameManager __instance)
     {
+        Last = UnityEngine.Time.unscaledTime;
         if (DebugTools.Instance == null || !DebugTools.Instance.SelfTestRunning)
         {
             return;

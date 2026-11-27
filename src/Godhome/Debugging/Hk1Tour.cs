@@ -32,9 +32,15 @@ internal static class Hk1Tour
 
     private static readonly System.Reflection.MethodInfo LeverHit = AccessTools.Method(typeof(BossStatueLever), "OnTriggerEnter2D");
 
+    /// <summary>主角挥一刀（HeroController.Attack，私有）：照玩家敲前厅顶上的拉杆。</summary>
+    private static readonly System.Reflection.MethodInfo HeroAttack = AccessTools.Method(typeof(HeroController), "Attack", new[] { typeof(AttackDirection) });
+
     internal static IEnumerator Run(DebugTools host)
     {
         Running = true;
+        // 0.10.6：玩家一到四门都通关后从前厅顶上跳上去不切场景。巡视期间当第五扇门开着（之后重新加载的前厅里 top2 才在），
+        // 走玩家那条路。锁着时的样子以前各次巡视都查过（hk1tour-20261127_030830 等）。
+        Hk1Doors.DebugFinalOpen = true;
         string stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         string dir = Path.Combine(Paths.BepInExRootPath, "Godhome", "shots", "hk1-" + stamp);
         Directory.CreateDirectory(dir);
@@ -357,6 +363,12 @@ internal static class Hk1Tour
                         mc.MarkAssisted("hk1 tour / 前作巡视");
                         yield return Until(() => mc.State == LoomState.Fight, 60f);
                         Check(mc.State == LoomState.Fight && mc.CurrentBoss == p1.Bosses[0], $"进了第一场 / first fight entered: {mc.CurrentBoss?.Id}（{Scene()}）");
+                        // 0.10.6 玩家报：每个万神殿的第一场落地后动不了一小段。前作挑战门的 Change Scene 转场前设了“进场不接输入”
+                        // （等前作 GG_Boss_Door_Entrance 的演出交还），改道进本作战场后没人交还；Hk1Lobby.ReleaseHero 清掉。量淡入到能操作。
+                        yield return Until(() => Hero() is HeroController hc0 && hc0.acceptingInput && !hc0.controlReqlinquished
+                            && hc0.transitionState == HeroTransitionState.WAITING_TO_TRANSITION, 10f);
+                        float sinceFade = FadeSceneInTrace.Last >= 0f ? Time.unscaledTime - FadeSceneInTrace.Last : -1f;
+                        Check(sinceFade >= 0f && sinceFade < 2f, $"第一场淡入后能操作 / control after the first fight fades in: {sinceFade:0.00} 秒 / s（要小于 2 秒 / under 2 s）");
                         yield return new WaitForSecondsRealtime(2f);
                         LogView("pantheon-first-fight");
                         yield return Shot("pantheon-first-fight");
@@ -579,14 +591,33 @@ internal static class Hk1Tour
             if (Same() && HubReady() && Scene() == Hk1Lobby.Atrium)
             {
                 // 去屋顶的出口（top2）照前作要第五扇门开了才在：按我们的开门条件（p5 要先完成 p1～p4）。
+                // 巡视期间 Hk1Doors.DebugFinalOpen 当它开着（玩家一到四门都通关后的样子）；屋顶那扇门的样子仍按真实记录。
                 bool finalOpen = Hk1Doors.Unlocked(Hk1Doors.FinalDoor);
+                PantheonDef? p5 = PantheonCatalog.Find("p5");
+                bool p5Open = p5 != null && ModeController.PantheonUnlocked(p5);
                 TransitionPoint? up = Object.FindObjectsByType<TransitionPoint>(FindObjectsInactive.Include, FindObjectsSortMode.None).FirstOrDefault(t => t.name == "top2");
                 Check(up != null && up.gameObject.activeInHierarchy == finalOpen,
                     $"去屋顶的出口 / roof exit top2: {(up != null ? (up.gameObject.activeInHierarchy ? "开着 / open" : "关着 / closed") : "-")}（第五扇门 / final door {(finalOpen ? "开 / unlocked" : "锁 / locked")}）");
+                Log("去屋顶的出口 / roof exits: " + RoofExits());
                 yield return new WaitForSecondsRealtime(1f);
                 if (up != null && up.gameObject.activeInHierarchy)
                 {
-                    Sanctum.StandAt(Hero(), up.transform.position.x, up.transform.position.y - 0.5f);
+                    // 0.10.6 玩家报：一到四门都通关后在前厅顶上往上跳，画面上去了却不切场景。以前这里直接把人放进 top2 的触发区，玩家那条路没走过。
+                    // 照玩家：先站到出口正下方能站的地方截图；再从出口下沿往上跳进去（真实物理，走 TransitionPoint 的 OnTriggerEnter2D → TryDoTransition）。
+                    yield return RoofLever();
+                    yield return JumpInto(up);
+                    if (Scene() != Hk1Lobby.Roof && !GameManager.instance.IsInSceneTransition && Same())
+                    {
+                        Log("往上跳进出口没有切场景，直接转场去屋顶接着看 / jumping into top2 did not change scene; transitioning to the roof to go on");
+                        Try("去屋顶 / to the roof", () => GameManager.instance.BeginSceneTransition(new GameManager.SceneLoadInfo
+                        {
+                            SceneName = Hk1Lobby.Roof,
+                            EntryGateName = "bot2",
+                            PreventCameraFadeOut = false,
+                            WaitForSceneTransitionCameraFade = true,
+                            Visualization = GameManager.SceneLoadVisualizations.Default,
+                        }));
+                    }
                 }
                 else
                 {
@@ -611,10 +642,146 @@ internal static class Hk1Tour
                     if (fifth != null)
                     {
                         bool lockShown = fifth.lockSet != null && fifth.lockSet.activeSelf;
-                        Check(lockShown != finalOpen, $"第五扇门的样子 / fifth door state: 锁 / lock set {lockShown}");
+                        Check(lockShown != p5Open, $"第五扇门的样子 / fifth door state: 锁 / lock set {lockShown}（记录里 / recorded {(p5Open ? "开 / unlocked" : "锁 / locked")}）");
                         yield return Go(fifth.transform.position.x - 2f, fifth.transform.position.y - 1f);
                         yield return Shot("door-p5");
                     }
+                }
+            }
+
+            // 前厅去屋顶的两个出口（top1、top2）：开没开、碰撞体、目的地、正下方的地面、出口到地面之间挡着的地形，父物体的开关。
+            string RoofExits()
+            {
+                var sb = new StringBuilder();
+                sb.Append($"转场被挡 / IsTransitionBlocked={TransitionPoint.IsTransitionBlocked}，游戏状态 / game state {GameManager.instance.GameState}；");
+                foreach (TransitionPoint t in Object.FindObjectsByType<TransitionPoint>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                    .Where(t => t.gameObject.scene.name == Hk1Lobby.Atrium && t.name.StartsWith("top", StringComparison.Ordinal)))
+                {
+                    Vector3 p = t.transform.position;
+                    Collider2D? c = t.GetComponent<Collider2D>();
+                    sb.Append($" ‖ {t.name}：开着 / active {t.gameObject.activeInHierarchy}（自己 / self {t.gameObject.activeSelf}，组件 / enabled {t.enabled}）pos ({p.x:0.0}, {p.y:0.0}) → {t.targetScene}@{t.entryPoint}，方向 / gate {t.GetGatePosition()}，门 / door {t.isADoor}，layer {t.gameObject.layer}；");
+                    string chain = "";
+                    for (Transform? x = t.transform.parent; x != null; x = x.parent)
+                    {
+                        chain += (chain.Length > 0 ? " < " : "") + x.name + (x.gameObject.activeSelf ? "" : "(off)");
+                    }
+                    sb.Append($"父物体 / parents {(chain.Length > 0 ? chain : "-")}；");
+                    if (c == null)
+                    {
+                        sb.Append("没有碰撞体 / no collider");
+                        continue;
+                    }
+                    Bounds bb = c.bounds;
+                    sb.Append($"{c.GetType().Name} enabled={c.enabled} trigger={c.isTrigger} 范围 / bounds ({bb.min.x:0.0}, {bb.min.y:0.0})~({bb.max.x:0.0}, {bb.max.y:0.0})；");
+                    RaycastHit2D down = Physics2D.Raycast(new Vector2(bb.center.x, bb.min.y - 0.1f), Vector2.down, 80f, 1 << 8);
+                    if (down.collider == null)
+                    {
+                        sb.Append("正下方 80 格内没有地面 / no ground within 80 below");
+                        continue;
+                    }
+                    sb.Append($"正下方的地面 / ground below {down.collider.name} y {down.point.y:0.0}（离出口下沿 / gap to the exit {down.distance:0.0}）；");
+                    Collider2D[] between = Physics2D.OverlapAreaAll(new Vector2(bb.min.x - 4f, down.point.y + 0.5f), new Vector2(bb.max.x + 4f, bb.min.y), 1 << 8);
+                    sb.Append($"中间的地形 / terrain in between {between.Length}：" + string.Join("，", between.Take(12).Select(o =>
+                        $"{o.name}{(o.isTrigger ? "(trigger)" : "")}{(o.usedByEffector ? "(effector)" : "")} ({o.bounds.min.x:0.0}, {o.bounds.min.y:0.0})~({o.bounds.max.x:0.0}, {o.bounds.max.y:0.0})")));
+                }
+                return sb.ToString();
+            }
+
+            // 0.10.6：第五扇门开了以后，前厅顶上还有一片叶子（gg_atrium_hidden_path/top_leaves_closed，带 Roof 碰撞体，x 122～171、y 73～98）
+            // 挡着 top2（第一次跳 top2 没切场景就是撞在它上面）。前作的开法（离线读 level424）：门顶动画 Unlocked 只让拉杆 gg_roof_lever 出来，
+            // 要用骨钉敲它（Switch Control：ReceivedDamage → NAIL HIT → Check If Nail 读攻击者的 damages_enemy → In Range → Hit → Open），
+            // 再给隐藏通道发 OPEN（Roar → Smash → Open，关掉叶子）。照玩家：站到拉杆左边、朝它真的挥一刀，看叶子关没关。FSM 写到 roof-fsm.txt。
+            IEnumerator RoofLever()
+            {
+                Scene atrium = SceneManager.GetSceneByName(Hk1Lobby.Atrium);
+                GameObject? Root(string n) => atrium.IsValid() ? atrium.GetRootGameObjects().FirstOrDefault(r => r.name == n) : null;
+                Transform? lever = Root("gg_roof_door_pieces")?.transform.Find("GG_door_caps/gg_roof_lever");
+                Transform? hidden = Root("gg_atrium_hidden_path")?.transform;
+                Transform? leaves = hidden != null ? hidden.Find("top_leaves_closed") : null;
+                string FsmsOf(Transform? t) => t == null ? "-" : string.Join(",", t.GetComponents<PlayMakerFSM>().Select(f => $"{f.FsmName}@{f.ActiveStateName}"));
+                string State() => $"拉杆 / lever {(lever == null ? "-" : lever.gameObject.activeInHierarchy ? "在 / shown" : "不在 / hidden")} {FsmsOf(lever)}，"
+                    + $"通道 / path {FsmsOf(hidden)}，叶子 / leaves {(leaves == null ? "-" : leaves.gameObject.activeInHierarchy ? "关着 / closed" : "开了 / open")}";
+                Log("屋顶机关 / roof mechanism: " + State());
+                var sb = new StringBuilder();
+                foreach (Transform t in new[] { lever, hidden }.Where(t => t != null).Cast<Transform>())
+                {
+                    foreach (PlayMakerFSM f in t.GetComponentsInChildren<PlayMakerFSM>(true))
+                    {
+                        FsmDump.Write(f, sb);
+                    }
+                }
+                File.WriteAllText(Path.Combine(dir, "roof-fsm.txt"), sb.ToString());
+                if (lever == null || leaves == null || !lever.gameObject.activeInHierarchy || !leaves.gameObject.activeInHierarchy)
+                {
+                    Check(leaves == null || !leaves.gameObject.activeInHierarchy, "第五扇门开了，拉杆出来了 / the roof lever shows when the fifth door is open: " + State());
+                    yield break;
+                }
+                yield return Go(lever.position.x - 1.5f, lever.position.y);
+                HeroController h = Hero();
+                h.FaceRight();
+                yield return Shot("roof-lever");
+                for (int n = 0; n < 3 && leaves.gameObject.activeInHierarchy; n++)
+                {
+                    Try("挥刀 / slash", () => HeroAttack.Invoke(h, new object[] { AttackDirection.normal }));
+                    yield return new WaitForSecondsRealtime(0.8f);
+                    Log($"挥刀 / slash {n + 1}：{Where()}，{State()}");
+                }
+                yield return Until(() => !leaves.gameObject.activeInHierarchy, 8f);
+                Check(!leaves.gameObject.activeInHierarchy, "敲拉杆打开去屋顶的路 / striking the roof lever opens the way up: " + State());
+                yield return Shot("roof-lever-after");
+            }
+
+            // 照玩家进出口：站到 top2 正下方的地面截图；再放到出口下沿往下 1.5 格、给往上的速度，看触发区收没收到、切没切场景。
+            IEnumerator JumpInto(TransitionPoint up)
+            {
+                Collider2D? c = up.GetComponent<Collider2D>();
+                HeroController h = Hero();
+                if (c == null || h == null)
+                {
+                    Check(false, "top2 没有碰撞体 / top2 has no collider");
+                    yield break;
+                }
+                Bounds bb = c.bounds;
+                RaycastHit2D down = Physics2D.Raycast(new Vector2(bb.center.x, bb.min.y - 0.1f), Vector2.down, 80f, 1 << 8);
+                if (down.collider != null)
+                {
+                    Sanctum.StandAt(h, bb.center.x, down.point.y);
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    yield return Shot("roof-exit-below");
+                }
+                Collider2D? heroCol = h.GetComponent<Collider2D>();
+                float half = heroCol != null ? heroCol.bounds.extents.y : 1f;
+                Sanctum.StandAt(h, bb.center.x, bb.min.y - 1.5f - 2f * half);
+                if (h.Body != null)
+                {
+                    h.Body.linearVelocity = new Vector2(0f, 20f);
+                }
+                Log($"从出口下沿往上跳 / jumping up into top2 from below: {Where()}，能操作 / input {h.acceptingInput}，过场移动 / cutscene movement {h.cState.isInCutsceneMovement}，后坐 / recoiling {h.cState.recoiling}，缚丝 / binding {h.cState.isBinding}"
+                    + $"；主角碰撞体 / hero collider {(heroCol != null ? $"{heroCol.name} layer {heroCol.gameObject.layer}，和出口那层碰不碰 / collides with layer {up.gameObject.layer} {!Physics2D.GetIgnoreLayerCollision(heroCol.gameObject.layer, up.gameObject.layer)}" : "-")}"
+                    + $"；出口 / gate gm {(Traverse.Create(up).Field("gm").GetValue() != null ? "有 / set" : "没有 / null")}，activated {Traverse.Create(up).Field("activated").GetValue()}");
+                float t0 = Time.unscaledTime;
+                float highest = h.transform.position.y;
+                float top = heroCol != null ? heroCol.bounds.max.y : highest;
+                bool touched = false;
+                TopGateTrace.Calls = 0;
+                while (Time.unscaledTime - t0 < 3f && Scene() == Hk1Lobby.Atrium && !GameManager.instance.IsInSceneTransition)
+                {
+                    highest = Mathf.Max(highest, Hero().transform.position.y);
+                    if (heroCol != null)
+                    {
+                        top = Mathf.Max(top, heroCol.bounds.max.y);
+                        // 只比 x、y（Bounds.Intersects 连 z 也比，2D 碰撞体 z 不同就总是 false）。
+                        Bounds gb = c.bounds, hb = heroCol.bounds;
+                        touched |= c.IsTouching(heroCol) || (hb.min.x <= gb.max.x && hb.max.x >= gb.min.x && hb.min.y <= gb.max.y && hb.max.y >= gb.min.y);
+                    }
+                    yield return null;
+                }
+                bool went = GameManager.instance.IsInSceneTransition || Scene() == Hk1Lobby.Roof;
+                Check(went, $"往上跳进 top2 切场景 / jumping into top2 starts the scene change: 切了 / transitioning {went}，最高 / highest y {highest:0.0}，碰撞体顶 / collider top {top:0.0}（出口下沿 / exit bottom {bb.min.y:0.0}），"
+                    + $"碰到出口 / overlapped the gate {touched}，出口收到的调用 / gate trigger calls {TopGateTrace.Calls}，{Where()}");
+                if (!went)
+                {
+                    yield return Shot("roof-exit-stuck");
                 }
             }
 
@@ -688,6 +855,7 @@ internal static class Hk1Tour
         finally
         {
             Running = false;
+            Hk1Doors.DebugFinalOpen = false;
             DebugTools.AllowHeroDamage = false;
             string result = !completed ? $"没跑完 / incomplete（{fails} 项没通过 / failed）" : fails == 0 ? "全部通过 / all passed" : fails + " 项没通过 / failed";
             lines.Insert(3, $"- 结果 / result: {result}");
@@ -704,5 +872,36 @@ internal static class Hk1Tour
                 Application.Quit();
             }
         }
+    }
+}
+
+/// <summary>
+/// [调试] 前作巡视期间，前作场景里朝上的出口（top1、top2）收到的 OnTriggerEnter2D / TryDoTransition：
+/// 谁进来、那一刻游戏状态、主角的后坐 / 过场移动 / 缚丝，查“跳进 top2 不切场景”（0.10.6 玩家报）。每个出口每秒最多记一次。
+/// </summary>
+[HarmonyPatch(typeof(TransitionPoint), "TryDoTransition")]
+internal static class TopGateTrace
+{
+    internal static int Calls;
+    private static float next;
+
+    private static void Prefix(TransitionPoint __instance, Collider2D heroCollider)
+    {
+        if (!Hk1Tour.Running || __instance == null || !__instance.name.StartsWith("top", StringComparison.Ordinal))
+        {
+            return;
+        }
+        Calls++;
+        if (Time.unscaledTime < next)
+        {
+            return;
+        }
+        next = Time.unscaledTime + 1f;
+        GameManager gm = GameManager.instance;
+        HeroController h = HeroController.instance;
+        GodhomePlugin.Log.LogInfo($"[Godhome]   出口触发 / gate trigger {__instance.name}：{(heroCollider != null ? $"{heroCollider.name} layer {heroCollider.gameObject.layer}" : "-")}，"
+            + $"gm {(Traverse.Create(__instance).Field("gm").GetValue() != null ? "有 / set" : "没有 / null")}，状态 / state {gm?.GameState}，被挡 / blocked {TransitionPoint.IsTransitionBlocked}，"
+            + $"后坐 / recoiling {h?.cState.recoiling}，过场移动 / cutscene {h?.cState.isInCutsceneMovement}，缚丝 / binding {h?.cState.isBinding}，"
+            + $"目的地 / target {__instance.targetScene}@{__instance.entryPoint}");
     }
 }
