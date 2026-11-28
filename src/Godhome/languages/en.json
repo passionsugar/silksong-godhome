@@ -49,8 +49,8 @@
     "BIND_MASK":  "Mask",
     "BIND_TOOLS":  "Tools",
     "BIND_SILK":  "Silk",
-    "BIND_DESC_NEEDLE":  "Needle binding: damage is capped at {0}; at or below {0} it is cut by a fifth",
+    "BIND_DESC_NEEDLE":  "Caps the Needle at upgrade level {0} for this Pantheon run",
     "BIND_DESC_MASK":  "Mask binding: at most {0} masks",
     "BIND_DESC_TOOLS":  "Tool binding: every tool falls silent",
-    "BIND_DESC_SILK":  "Silk binding: the spool holds at most {0} silk"
+    "BIND_DESC_SILK":  "The spool holds up to {0} silk. Bind heals 2 masks. Multibinder heals 1, then 2"
 }

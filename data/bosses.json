@@ -90,6 +90,9 @@
         "scene": "Tut_03"
       },
       "arena": {
+        "health": {
+          "Mossbone Mother": 520
+        },
         "door": [
           54.1,
           18.6
@@ -180,6 +183,9 @@
         "scene": "Bone_05"
       },
       "arena": {
+        "health": {
+          "Bone Beast": 540
+        },
         "door": [
           85.5,
           4.6
@@ -236,6 +242,9 @@
         "scene": "Bone_East_12"
       },
       "arena": {
+        "health": {
+          "Lace Boss1": 600
+        },
         "$comment": "落点：原来的门 (95.8, 8.6) 离蕾丝 (102.9, 7.1) 只有 7 格，0.10.1 玩家反馈进场撞 Boss；自检的进场检查进场 1.0 秒就被她冲过来打到（Charge Hit）。门往左挪到 88.8，还在开战的触发区里。",
         "door": [
           88.8,
@@ -319,10 +328,14 @@
         "scene": "Bone_East_08"
       },
       "arena": {
+        "health": {
+          "SG_head": 400
+        },
         "door": [
           78.0,
           8.1
         ],
+        "playerBounds": [66.1, -2.8, 96.3, 32.1],
         "face": "right",
         "wake": {
           "path": "Boss Scene",
@@ -337,6 +350,30 @@
           }
         ],
         "patch": [
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene/song_golem/Song_Butt/SG_waist/Torso/SG_head",
+            "fsm": "Phase Control",
+            "state": "HP Check 1",
+            "threshold": 361,
+            "required": true
+          },
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene/song_golem/Song_Butt/SG_waist/Torso/SG_head",
+            "fsm": "Phase Control",
+            "state": "HP Check 2",
+            "threshold": 261,
+            "required": true
+          },
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene/song_golem/Song_Butt/SG_waist/Torso/SG_head",
+            "fsm": "Phase Control",
+            "state": "HP Check 3",
+            "threshold": 161,
+            "required": true
+          },
           {
             "type": "activate",
             "path": "Boss Scene/Lava Plats"
@@ -569,6 +606,9 @@
         "scene": "Belltown_Shrine"
       },
       "arena": {
+        "health": {
+          "Spinner Boss": 720
+        },
         "$comment": "血量打空后 Spinner Boss::Control 走 Death Stagger → Hornet Dash → Hornet Connect → Can Bind，原版在 Can Bind / Rebind Ready 等玩家连按几次缚丝键（ListenForCast BIND，每次 Binds 减一），缚完（Bind Burst 的 SHIFT）进 Final Bind Burst 收尾。玩家反馈想跳过：Hornet Connect 的 FINISHED 直接到 Final Bind Burst（只有这一条路进 Hornet Connect），收尾动画照放，到 Final Bind Burst 判胜。",
         "door": [
           54.4,
@@ -581,6 +621,22 @@
           "state": "Dormant"
         },
         "patch": [
+          {
+            "type": "var",
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
+            "fsm": "Control",
+            "name": "P2 HP",
+            "int": 500,
+            "required": true
+          },
+          {
+            "type": "var",
+            "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
+            "fsm": "Control",
+            "name": "P3 HP",
+            "int": 300,
+            "required": true
+          },
           {
             "type": "goto",
             "path": "Black Thread States Thread Only Variant/Normal World/Boss Scene/Spinner Boss",
@@ -780,7 +836,10 @@
         "scene": "Organ_01"
       },
       "arena": {
-        "$comment": "开战的是场景总控 Boss Scene::Control：[Init] 用 SendTrigger2DEvent 等玩家进 Boss Scene 自己的触发区，进了才走 Enter → 风琴 → 雾柱 → Start Battle，给 Phantom 发 PHANTOM START（Phantom::Control 一直停在 Dormant 等这个事件）。入场门放在这个触发区里。",
+        "health": {
+          "Phantom": 520
+        },
+        "$comment": "开战的是场景总控 Boss Scene::Control：[Init] 用 SendTrigger2DEvent 等玩家进 Boss Scene 自己的触发区，进了才走 Enter → 风琴 → 雾柱 → Start Battle，给 Phantom 发 PHANTOM START（Phantom::Control 一直停在 Dormant 等这个事件）。入场门放在这个触发区里。Rage? 的原版比较是严格小于，520 血时用 261 对应剩余 260 血及以下。神居在 ZERO HP 时通过原生 Send 通知本体播放死亡特效，并在 Death Explode 判胜，跳过最后的弹反教学、技能奖励和回血。",
         "door": [
           84.4,
           105.6
@@ -795,7 +854,37 @@
           {
             "path": "Boss Scene/Phantom",
             "fsm": "Control",
-            "state": "UI Msg"
+            "state": "Death Explode",
+            "terminal": true
+          }
+        ],
+        "patch": [
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene/Phantom",
+            "fsm": "Control",
+            "state": "Rage?",
+            "name": "Rage HP",
+            "threshold": 261,
+            "required": true
+          },
+          {
+            "type": "goto",
+            "path": "Boss Scene/Phantom",
+            "fsm": "Death Control",
+            "from": "Idle",
+            "event": "ZERO HP",
+            "to": "Send",
+            "required": true
+          },
+          {
+            "type": "goto",
+            "path": "Boss Scene/Phantom",
+            "fsm": "Control",
+            "from": "*",
+            "event": "FINAL BLOCK",
+            "to": "Death Explode",
+            "required": true
           }
         ]
       },
@@ -823,15 +912,6 @@
             "path": "Boss Scene/Phantom",
             "fsm": "Control",
             "when": "Init|Dormant|Appear"
-          }
-        ],
-        "react": [
-          {
-            "type": "event",
-            "path": "Boss Scene/Phantom",
-            "fsm": "Control",
-            "when": "Parry Ready",
-            "event": "PARRY"
           }
         ],
         "timeout": 120
@@ -914,6 +994,30 @@
         "scene": "Dock_09"
       },
       "arena": {
+        "patch": [
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "state": "Upgrade Thrower",
+            "threshold": 315,
+            "required": true,
+            "heal": 180
+          },
+          {
+            "type": "hpCheck",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "state": "Upgrade Slasher",
+            "threshold": 315,
+            "required": true,
+            "heal": 180
+          }
+        ],
+        "health": {
+          "Dock Guard Slasher": 648,
+          "Dock Guard Thrower": 468
+        },
         "$comment": "开战的是场景总控 Boss Scene::Control：[Battle Ready] 用 CheckAlertRangeByName 等玩家进 Battle Start Range（x≈21，西格尼斯旁边），进了才给西格尼斯发 BATTLE START。入场门放在这个范围里。",
         "door": [
           26.5,
@@ -1211,6 +1315,9 @@
         "scene": "Room_CrowCourt_02"
       },
       "arena": {
+        "health": {
+          "Crawfather": 1100
+        },
         "$comment": "原版 Battle Scene 前 5 波是鸦人陪审员，第 6 波才是鸦虫教父：神居版跳过前 5 波（skipWaves），开战直接打鸦虫教父（原版延迟 2 秒出场）。第 1、3、5 波的 Wave Starter 只管人群吼叫和叫本波的小怪开打。战斗中鸦虫教父叫来的陪审员（Crow Summons）是 Boss 自己的招式，不动。",
         "door": [
           35.2,
@@ -1549,6 +1656,20 @@
             "from": "Bind Prepare Refight",
             "event": "FINISHED",
             "to": "Bind Start"
+          },
+          {
+            "type": "holdInput",
+            "path": "Shrine First Weaver",
+            "fsm": "Inspection",
+            "state": "Look Back|Bind Prepare Refight|Bind Start|Blow Start|Bind|Break Out|Shoot Down|Intro Land",
+            "required": true
+          },
+          {
+            "type": "holdInput",
+            "path": "Boss Scene/First Weaver",
+            "fsm": "Control",
+            "state": "Intro Wave|Intro Stand|Intro Flourish|Flourish End|Roar|Intro Roar End",
+            "required": true
           }
         ],
         "keep": [
@@ -1806,7 +1927,8 @@
       },
       "prerequisites": {
         "playerData": {
-          "wardBossHatchOpened": true
+          "collectedWardBossKey": true,
+          "wardBossHatchOpened": false
         }
       },
       "journal": [
@@ -1830,7 +1952,7 @@
           }
         ]
       },
-      "notes": "附加场景，加载条件 WillLoadWardBoss=true。WillLoadWardBoss 是计算属性（!wardBossDefeated && (collectedWardBossKey || wardBossHatchOpened)），所以前置条件改成设 wardBossHatchOpened。有 Head Invuln Check（头部无敌判定）。"
+      "notes": "用 collectedWardBossKey 满足 WillLoadWardBoss；右侧通道保留未开门状态。有 Head Invuln Check（头部无敌判定）。"
     },
     {
       "id": "second_sentinel",
@@ -1969,7 +2091,7 @@
         "scene": "Cradle_03"
       },
       "arena": {
-        "$comment": "不跳过挑战：入场门在原版的挑战区（Challenge Region，提示“挑战”）里，玩家按交互键挑战后才开打（你要求的）。开战判定看 Intro Sequence 的 First Challenge：Idle 收到挑战区发的 CHALLENGE START 才走（挑战区自己的 Idle → In Region 只是人进了区）。崇高圣母灵丝是特殊死亡：Phase Control 打到 Death Hit 进死亡动画和结局，在 Death Hit 插结束。hudGrace 45：开场演出（First Challenge 的 Challenge Cam、Silk Boss 的 Intro Up）收着 HUD，原版到 Silk Boss 的 Begin 才发 IN，挑战以后约 20 秒（0.10.3 实测 20.5 秒）；自检直接发 INTERACT 时演出里人能动，默认 2 秒会提前叫回来（0.10.3 第五万神殿回归看到的）。",
+        "$comment": "在神居关闭手动挑战区。角色就位后，给 First Challenge 原本的接收状态依次发 CHALLENGE START 和 CHALLENGE，原版照常关门、切镜头、唤醒 Boss。开场保留 45 秒 HUD 宽限，死亡在 Death Hit 判胜。",
         "door": [
           42.2,
           134.6
@@ -1988,11 +2110,46 @@
             "terminal": true
           }
         ],
-        "keep": [
-          "Boss Scene/Intro Sequence/Challenge Region"
+        "hudGrace": 45,
+        "enter": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Intro Sequence",
+            "fsm": "First Challenge",
+            "when": "Idle",
+            "event": "CHALLENGE START",
+            "required": true
+          },
+          {
+            "type": "event",
+            "path": "Boss Scene/Intro Sequence",
+            "fsm": "First Challenge",
+            "when": "Challenge Cam",
+            "event": "CHALLENGE",
+            "required": true
+          }
         ],
-        "challenge": true,
-        "hudGrace": 45
+        "patch": [
+          {
+            "type": "deactivate",
+            "path": "Boss Scene/Intro Sequence/Challenge Region",
+            "required": true
+          },
+          {
+            "type": "holdInput",
+            "path": "Boss Scene/Intro Sequence",
+            "fsm": "First Challenge",
+            "state": "Challenge Cam|Wait For Beat End|Burst Anim|Ready Wait|Intro Shake|Hero Facing|Hero L|Hero R|Straight Back",
+            "required": true
+          },
+          {
+            "type": "holdInput",
+            "path": "Boss Scene/Silk Boss",
+            "fsm": "Control",
+            "state": "Ready|Intro Up|Intro Roar|Title Up",
+            "required": true
+          }
+        ]
       },
       "bossObjects": [
         "Silk Boss"
@@ -2015,14 +2172,6 @@
       "debug": {
         "timeout": 240,
         "react": [
-          {
-            "type": "event",
-            "path": "Boss Scene/Intro Sequence/Challenge Region",
-            "fsm": "Challenge",
-            "when": "In Region",
-            "after": 1.5,
-            "event": "INTERACT"
-          },
           {
             "type": "event",
             "path": "Boss Scene/Silk Boss",
@@ -2058,7 +2207,10 @@
         "scene": "Library_09"
       },
       "arena": {
-        "$comment": "原版：人进 Start Range，Garmond Scene 的 Control 给加蒙德发 CITADEL CHARGE（冲进来 → Cit WalkTo → Cit NPC 变成对话 NPC），玩家答应切磋后 NPC 发 BATTLE START（Setup 1 设 Hero Battle、圈场地 → 吼叫 → Idle → 打）。门在 Start Range 里：加载那一刻场景控制就收到进入、发了 CITADEL CHARGE，加蒙德还在 Wait Hero In Position，事件丢了（0.9.0 全量自检停在 Dormant）。神居版进场后等它到 Dormant 再发一次 CITADEL CHARGE（原版同一个事件），到 Cit NPC 替玩家答应切磋：Cit NPC 打开对话 NPC 子物体 Citadel Library NPC，它的 Dialogue 一进 Idle 就切到原版答应以后的 Battle Start（结束对话、给加蒙德发 BATTLE START、关掉自己）。以前直接给加蒙德发 BATTLE START，对话 NPC 一直开着、停在 Idle：交互提示还在（按上会开始对话），听到织针曲、受惊（噪音）时对加蒙德播 Sing 动画（0.10.1 玩家报“中途变回对话模式”）。Quick Fight 那条是它和别的敌人打（Auto Target），不是和玩家打，不用。加蒙德的 FSM 用模板，结束动作靠模板 FSM 醒来后重插（Arena.OnFsmAwake）。",
+        "health": {
+          "Garmond Fighter": 700
+        },
+        "$comment": "原版：人进 Start Range，Garmond Scene 的 Control 给加蒙德发 CITADEL CHARGE（冲进来 → Cit WalkTo → Cit NPC 变成对话 NPC），玩家答应切磋后 NPC 发 BATTLE START（Setup 1 设 Hero Battle、圈场地 → 吼叫 → Idle → 打）。门在 Start Range 里：加载那一刻场景控制就收到进入、发了 CITADEL CHARGE，加蒙德还在 Wait Hero In Position，事件丢了（0.9.0 全量自检停在 Dormant）。神居版进场后等它到 Dormant 再发一次 CITADEL CHARGE（原版同一个事件），到 Cit NPC 替玩家答应切磋：Cit NPC 打开对话 NPC 子物体 Citadel Library NPC，它的 Dialogue 一进 Idle 就切到原版答应以后的 Battle Start（结束对话、给加蒙德发 BATTLE START、关掉自己）。以前直接给加蒙德发 BATTLE START，对话 NPC 一直开着、停在 Idle：交互提示还在（按上会开始对话），听到织针曲、受惊（噪音）时对加蒙德播 Sing 动画（0.10.1 玩家报“中途变回对话模式”）。Quick Fight 那条是它和别的敌人打（Auto Target），不是和玩家打，不用。加蒙德的 FSM 用模板，结束动作靠模板 FSM 醒来后重插（Arena.OnFsmAwake）。 若原生入场已开始冲锋或已经就位，就直接等对话 NPC 的 Battle Start。",
         "door": [
           73.8,
           16.7
@@ -2075,7 +2227,8 @@
             "path": "Black Thread States/Normal World/Scene Control/Garmond Scene/Garmond Fighter",
             "fsm": "Control",
             "when": "Dormant",
-            "event": "CITADEL CHARGE"
+            "event": "CITADEL CHARGE",
+            "skipWhen": "Citadel Charge|Citadel Skid|Citadel P|Cit WalkTo|Citadel Remeet|Cit NPC"
           },
           {
             "type": "state",
@@ -2142,6 +2295,10 @@
         "scene": "Cog_07"
       },
       "arena": {
+        "health": {
+          "Song Automaton Ball R": 270,
+          "Song Automaton Ball L": 270
+        },
         "$comment": "整个 Battle Scene Test/Battle Scene 由 TestGameObjectActivator 管：blackThreadWorld 为真（第三幕）才激活，所以前置条件临时设 blackThreadWorld=true（0.9.0 全量自检：两只自鸣球都没激活）。 Battle Scene 的触发区是多边形，顶点 (38.6,68.4) (27.5,92.0) (18.4,68.6) (23.6,68.7) (28.0,78.2) (32.5,68.8)：底部中间开了倒 V 口，地面那一层只有 x≈19.3–24.7 和 31.5–37.4 两段在里面；门放在左边那段（原来的 x=12.3 在外面，BattleScene 不开战）。",
         "door": [
           21.5,
@@ -2428,6 +2585,9 @@
         "scene": "Clover_19"
       },
       "arena": {
+        "health": {
+          "Cloverstag White Boss": 600
+        },
         "$comment": "门原来在 (31.1, 18.1)，落地 (30.2, 12.6) 离苍白苜鹿 0.7 格，正落在它身上：它吼叫时定住人（StartRoarEmitter stunHero），吼完（Roar End）才打开头上的伤害盒（Head Box），人躲不开，必挨一下（0.10.1 玩家报）。挪到它右边、朝左：落地离它约 6 格，还在它的 Start Range（x 24.1–39.4，Rest 等人进来才 WAKE）里。",
         "door": [
           37.5,
@@ -2549,6 +2709,9 @@
         "scene": "Memory_Coral_Tower"
       },
       "arena": {
+        "health": {
+          "Coral King": 1500
+        },
         "door": [
           50.6,
           558.1
@@ -2609,7 +2772,7 @@
         "scene": "Memory_Ant_Queen"
       },
       "arena": {
-        "$comment": "原版卡梅莉塔吼完进 Battle Dance：调 Boss Scene/Battle Scene 的 StartBattle，让 4 波猎手小怪先打（最后一波是两只 Bone Hunter Fly Chief），自己在背景跳舞，收到 BATTLE END 才下场（Launch In Antic）。神居版改跳转（Battle Roar End 的 FINISHED 直接到 Launch In Antic），跳过猎手波次；Battle Dance 里只有开战和换音乐，Launch In Antic 自己会换 Boss 战音乐。不跳过挑战（和崇高圣母灵丝一样）：卡梅莉塔在背景跳舞（BG Dance），等挑战区 Challenge Region 发 CHALLENGE 才吼叫下场。保留挑战区（keep），入场门在挑战区上方，玩家按交互键挑战后才开打；自检替玩家按（debug.react）。0.9.0 冒烟测试时挑战区被当成交互物体关掉了，她一直停在 BG Dance。",
+        "$comment": "在神居关闭手动挑战区。落地后给背景跳舞中的卡梅丽塔发送原生 CHALLENGE。保留 Battle Roar End → Launch In Antic，跳过猎手小怪的四波前置战。",
         "door": [
           149.0,
           21.1
@@ -2628,12 +2791,23 @@
             "from": "Battle Roar End",
             "event": "FINISHED",
             "to": "Launch In Antic"
+          },
+          {
+            "type": "deactivate",
+            "path": "Boss Scene/Challenge Region",
+            "required": true
           }
         ],
-        "keep": [
-          "Boss Scene/Challenge Region"
-        ],
-        "challenge": true
+        "enter": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Hunter Queen Boss",
+            "fsm": "Control",
+            "when": "BG Dance",
+            "event": "CHALLENGE",
+            "required": true
+          }
+        ]
       },
       "bossObjects": [
         "Hunter Queen Boss"
@@ -2649,19 +2823,6 @@
       },
       "prerequisites": {
         "playerData": {}
-      },
-      "debug": {
-        "$comment": "替玩家在挑战区里按交互键（只在自检里用）。",
-        "react": [
-          {
-            "type": "event",
-            "path": "Boss Scene/Challenge Region",
-            "fsm": "Challenge",
-            "when": "In Region",
-            "after": 1.5,
-            "event": "INTERACT"
-          }
-        ]
       },
       "notes": "记忆场景。原版卡梅莉塔下场前有 4 波猎手小怪，神居版跳过（见 arena.$comment）。"
     },
@@ -2745,12 +2906,12 @@
         "scene": "Coral_33"
       },
       "arena": {
-        "$comment": "开战判定：Control 的 Dormant 收到 EXIT（人出了 Can Start Range）回 Out of Start Range，那里收到 ENTER 又回 Dormant，两个都是等玩家的状态，所以写 Out of Start Range|Dormant；Dormant 收到 WAKE（人进 Stab Range）或 TOOK DAMAGE 才去 Roar Antic 开战。进场步骤关掉 Pre Garmond、打开加蒙德本体。 落点：原来的门 (23.7, 66.5) 就在加蒙德 (23.7, 62.0) 头上，进场就碰到（0.10.1 玩家反馈进场撞 Boss）。门往左挪到 18.7，还在 Can Start Range 里。",
+        "$comment": "开战判定：Control 的 Dormant 收到 EXIT（人出了 Can Start Range）回 Out of Start Range，那里收到 ENTER 又回 Dormant，两个都是等玩家的状态，所以写 Out of Start Range|Dormant；Dormant 收到 WAKE（人进 Stab Range）或 TOOK DAMAGE 才去 Roar Antic 开战。进场步骤关掉 Pre Garmond、打开加蒙德本体。 门改在加盟德右侧，处于 Can Start Range 和 Stab Range 的交集，朝左面对他。",
         "door": [
-          18.7,
-          66.5
+          29.5,
+          62.0
         ],
-        "face": "right",
+        "face": "left",
         "wake": {
           "path": "Black Thread States/Black Thread World/Garmond Scenes/Garmond Black Threaded Scene/Garmond Black Threaded Fighter",
           "fsm": "Control",
@@ -2878,12 +3039,12 @@
         "scene": "Peak_07"
       },
       "arena": {
-        "$comment": "加载时补丁让 Pinstress Control 的 Check 发 NO PINSTRESS 时也去 Pinstress（原版自己的状态，激活 Pinstress Scene、关掉 No Pinstress Scene），不走剧情检查；Check 前两个动作先 FindNamedChild 找到这两个物体（直接从 Pause 跳过去变量是空的，场景激活不了）。针姬本体在 Boss 的 Dormant 里关了渲染（SetMeshRenderer 0），原版是 NPC Control 的 Wake 2（雪堆被打醒）把它打开、关掉睡觉的贴图；Accept 只在“坐着”（Is Sitting）时才开渲染。以前进场直接从 Snow Sleep 设到 Accept，Wake 2 没走，整场看不见针姬（0.10.1 玩家报“开打直接隐身”，以前的自检截图里也只看得到她的针）。现在进场后等 NPC Control 到 Snow Sleep，发原版自己的 TEST（Snow Sleep → Wake 1 → Wake 2 → Wake 3：醒来的动画、开渲染、关睡觉贴图），到 Meet Ready（醒了、等玩家对话）再设到 Accept（原版接受切磋那一步：关交互、进 Battle Start 给 Boss 发 START BATTLE）。不再自己关睡觉的贴图：Wake 1 要等它的动画放完。门原来在 (38.0, 87.4)，正落在针姬身上（离 Boss 0 格），挪到右边 6 格、朝左（第八轮落点勘察的建议点之一，留在她的开战范围里）。",
+        "$comment": "加载时补丁让 Pinstress Control 的 Check 发 NO PINSTRESS 时也去 Pinstress（原版自己的状态，激活 Pinstress Scene、关掉 No Pinstress Scene），不走剧情检查；Check 前两个动作先 FindNamedChild 找到这两个物体（直接从 Pause 跳过去变量是空的，场景激活不了）。针姬本体在 Boss 的 Dormant 里关了渲染（SetMeshRenderer 0），原版是 NPC Control 的 Wake 2（雪堆被打醒）把它打开、关掉睡觉的贴图；Accept 只在“坐着”（Is Sitting）时才开渲染。以前进场直接从 Snow Sleep 设到 Accept，Wake 2 没走，整场看不见针姬（0.10.1 玩家报“开打直接隐身”，以前的自检截图里也只看得到她的针）。现在进场后等 NPC Control 到 Snow Sleep，发原版自己的 TEST（Snow Sleep → Wake 1 → Wake 2 → Wake 3：醒来的动画、开渲染、关睡觉贴图），到 Meet Ready（醒了、等玩家对话）再设到 Accept（原版接受切磋那一步：关交互、进 Battle Start 给 Boss 发 START BATTLE）。不再自己关睡觉的贴图：Wake 1 要等它的动画放完。 门放在左侧平台 (32, 87.4)，朝右面对针姬。",
         "door": [
-          44.0,
+          32.0,
           87.4
         ],
-        "face": "left",
+        "face": "right",
         "wake": {
           "path": "Pinstress Control/Pinstress Scene/Pinstress Boss",
           "fsm": "Control",
@@ -3021,9 +3182,9 @@
         "scene": "Bellway_Centipede_Arena"
       },
       "arena": {
-        "$comment": "门放进 Start Range（x 140.2–153.4，y 3.1–23.1）；Centipede Control 在 Dormant 等 ENTER，头尾都离场后进 Wait For Both Left 收尾。",
+        "$comment": "左右两面虫墙之间偏左入场。人站好后给 Centipede Control 的 Dormant 发 ENTER，原版照常执行 Set HP 和出场。",
         "door": [
-          146.5,
+          138.75,
           8.0
         ],
         "face": "right",
@@ -3037,6 +3198,17 @@
             "path": "Boss Scene/Centipede Control",
             "fsm": "Control",
             "state": "Wait For Both Left"
+          }
+        ],
+        "enter": [
+          {
+            "type": "event",
+            "path": "Boss Scene/Centipede Control",
+            "fsm": "Control",
+            "when": "Dormant",
+            "skipWhen": "Set HP|Body R Up|Intro Cam|Body L Down|Roar Head Up",
+            "event": "ENTER",
+            "required": true
           }
         ]
       },
@@ -3083,6 +3255,9 @@
         "scene": "Bone_Steel_Servant"
       },
       "arena": {
+        "health": {
+          "Abyss Mass": 840
+        },
         "$comment": "门放进 Start Range（x 17.5–30.9，y 1.8–19.9）。补丁：Init 的 COMPLETED（任务已完成）也回 Idle；Idle 收到 ENTER 直接进 Summon Start，跳过 Capture 的对话。",
         "door": [
           26.5,
@@ -3387,6 +3562,10 @@
         "scene": "Weave_03"
       },
       "arena": {
+        "health": {
+          "Mossbone Mother A": 280,
+          "Mossbone Mother B": 280
+        },
         "door": [
           4.3,
           21.6
@@ -3469,11 +3648,12 @@
         "scene": "Bone_East_08"
       },
       "arena": {
-        "$comment": "$Rematch 默认为真，Rematch Ready 等 Wake Range，落点就在里面，只停一帧。宿主场景 Bone_East_08 的 Boss Scene 是第四圣咏团的战斗，defeatedSongGolem 为假会在 Start Range 被唤醒（开墙、镜头锁），所以前置条件设 defeatedSongGolem=true，让它走 Defeated 分支。重打版（Rematch）每次选招（Choice）和踩地前（Stomp Pos）看人在不在 Arena Range（Rematch Ready 时从它身上摘下来的范围，x 66.1–96.3、y -2.8–32.1）里，不在就 GO HOME → Buzz To Home 飞回家、等人回到范围里才接着打（原版这场不锁人，人走开它就回家）。神居里人跑到范围边上它就不打了（0.10.1 玩家报“中途丢失仇恨”），所以两处 GO HOME 都改接 Charge Pos：人不在范围里就飞过去冲。0.10.6：Rematch Ready 里 CheckAlertRangeByName(Wake Range → BATTLE START) 排在一串初始化动作中间，落点在 Wake Range 里，进状态当帧就跳走，后面的 Final Slam=1、Low Y Point=9.6、High Y Pos=14、Enemy Remaining Max=1、SetParent(Arena Range, null) 都没执行（FsmState.ActivateActions 见 IsSwitchingState 就返回）：Choice 每次都走 DOOR SLAM，只在原高度来回撞墙、在墙边停（玩家报“飞到一边停着不打”，第九轮没找到这个）；Arena Range 也一直挂在 Boss 身上跟着跑（自检量到 x 77.8–112.6）。用 actionLast 把这个检查挪到最后。",
+        "$comment": "$Rematch 默认为真，Rematch Ready 等 Wake Range，落点就在里面，只停一帧。宿主场景 Bone_East_08 的 Boss Scene 是第四圣咏团的战斗，defeatedSongGolem 为假会在 Start Range 被唤醒（开墙、镜头锁），所以前置条件设 defeatedSongGolem=true，让它走 Defeated 分支。重打版（Rematch）每次选招（Choice）和踩地前（Stomp Pos）看人在不在 Arena Range（Rematch Ready 时从它身上摘下来的范围，x 66.1–96.3、y -2.8–32.1）里，不在就 GO HOME → Buzz To Home 飞回家、等人回到范围里才接着打（原版这场不锁人，人走开它就回家）。神居里人跑到范围边上它就不打了（0.10.1 玩家报“中途丢失仇恨”），所以两处 GO HOME 都改接 Charge Pos：人不在范围里就飞过去冲。0.10.6：Rematch Ready 里 CheckAlertRangeByName(Wake Range → BATTLE START) 排在一串初始化动作中间，落点在 Wake Range 里，进状态当帧就跳走，后面的 Final Slam=1、Low Y Point=9.6、High Y Pos=14、Enemy Remaining Max=1、SetParent(Arena Range, null) 都没执行（FsmState.ActivateActions 见 IsSwitchingState 就返回）：Choice 每次都走 DOOR SLAM，只在原高度来回撞墙、在墙边停（玩家报“飞到一边停着不打”，第九轮没找到这个）；Arena Range 也一直挂在 Boss 身上跟着跑（自检量到 x 77.8–112.6）。用 actionLast 把这个检查挪到最后。 神居强制加载兽蝇，但不接剧情任务。宿主 Beastfly? 先关掉宿主 Lava Plats，再做任务判断，避免六块宿主地板与兽蝇平台重合。",
         "door": [
           81.0,
           15.8
         ],
+        "playerBounds": [66.1, -2.8, 96.3, 32.1],
         "face": "right",
         "wake": {
           "path": "Boss Scene Beastfly/Beastfly States/Active/Bone Flyer Giant",
@@ -3503,6 +3683,14 @@
             "fsm": "Control",
             "state": "Rematch Ready",
             "name": "CheckAlertRangeByName",
+            "required": true
+          },
+          {
+            "type": "actionFirst",
+            "path": "Boss Scene",
+            "fsm": "Control",
+            "state": "Beastfly?",
+            "name": "ActivateGameObject",
             "required": true
           }
         ]
@@ -3625,9 +3813,9 @@
         "scene": "Abyss_Cocoon"
       },
       "arena": {
-        "$comment": "门放进 Intro Control 的 Start Range（x 38.7–59.8，y 3.6–32.7）；开战看 Intro Control 离开 Idle，之后的开场演出约 19 秒。",
+        "$comment": "重打出场的蕾丝在 x 38.0，背景的 Silk_body 在 x 45.15。门放两者中间，在原生开场触发范围内。",
         "door": [
-          46.0,
+          41.6,
           8.0
         ],
         "face": "right",
@@ -3641,6 +3829,15 @@
             "path": "Boss Control/Lost Lace Boss",
             "fsm": "Death Control",
             "state": "Can Die?"
+          }
+        ],
+        "patch": [
+          {
+            "type": "holdInput",
+            "path": "Boss Control/Intro Control",
+            "fsm": "Control",
+            "state": "Scene Setup|Take Control|Start Silk Breath|Taunt Start|Silk Fade Up|Silk Acknowledge|Lace Emerge|Lace Re-emerge|Lace Roar|Silk Scream|Title Up|Hornet Anim|Start Lace|Darkness Out|Title Up 2|Hornet Anim 2|Start Lace 2",
+            "required": true
           }
         ]
       },

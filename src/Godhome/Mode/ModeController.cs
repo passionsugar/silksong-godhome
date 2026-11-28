@@ -166,6 +166,10 @@ internal sealed class ModeController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (ReferenceEquals(Instance, this))
+        {
+            Bindings.Clear("mode controller destroyed");
+        }
         heroRecovery.Clear();
         SceneManager.sceneLoaded -= OnUnitySceneLoaded;
         SceneManager.sceneUnloaded -= OnUnitySceneUnloaded;
@@ -244,7 +248,7 @@ internal sealed class ModeController : MonoBehaviour
             {
                 if (Hk1Lobby.Active && State is LoomState.ToRest or LoomState.Rest)
                 {
-                    Hk1Spa.Prepare(scene);
+                    Hk1Spa.Prepare(scene, Run?.Current);
                 }
                 return;
             }
@@ -261,6 +265,17 @@ internal sealed class ModeController : MonoBehaviour
                 if (Hk1Lobby.Decide() && State is not (LoomState.ToRest or LoomState.Rest or LoomState.ToFight or LoomState.Fight))
                 {
                     Hk1Lobby.Prepare(scene);
+                }
+                return;
+            }
+            if (Run != null && State is (LoomState.ToRest or LoomState.Rest) && scene.name == PantheonCatalog.RestScene)
+            {
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    foreach (var pm in root.GetComponentsInChildren<PlayMakerFSM>(true))
+                    {
+                        PantheonRestBench.Configure(pm);
+                    }
                 }
                 return;
             }
@@ -343,7 +358,7 @@ internal sealed class ModeController : MonoBehaviour
         {
             Hk1Assets.StartPrepare();
         }
-        if (!Hk1EntryShowing && !AnyHubLoaded())
+        if (!GameManager.instance.IsInSceneTransition && !Hk1EntryShowing && !AnyHubLoaded())
         {
             Hk1Lobby.Reset();
         }
@@ -658,12 +673,16 @@ internal sealed class ModeController : MonoBehaviour
     }
 
     /// <summary>到了前作神居的一个房间：布置门或雕像（借图集、换石像），没有要等的就掀开黑幕。</summary>
-    private void OnHk1Arrive(string scene)
+    private void OnHk1Arrive(string scene, bool returningFromFight = false)
     {
         Hk1Lobby.OnArrive(scene);
-        if (!Hk1Hall.Busy && LoomUI.Instance != null && LoomUI.Instance.CoverAlpha > 0f)
+        if (LoomUI.Instance != null && LoomUI.Instance.CoverAlpha > 0f)
         {
             LoomUI.Instance.FadeCover(0f, 0.3f);
+        }
+        if (scene == Hk1Lobby.Workshop || returningFromFight)
+        {
+            StartCoroutine(Hk1FadeGuard(fightSerial, scene));
         }
     }
 
@@ -708,6 +727,7 @@ internal sealed class ModeController : MonoBehaviour
             }
         }
         Step("hero recovery", heroRecovery.Clear);
+        Step("bindings", () => Bindings.Clear("mode reset / 模式重置"));
         Step("snapshot", SaveGuard.Clear);
         // 万神殿连战作废（回标题、换存档：这次不记录），束缚解开，结算不再弹。
         Step("damage hook", UnhookDamage);
@@ -718,7 +738,6 @@ internal sealed class ModeController : MonoBehaviour
         Run = null;
         runFight = false;
         pendingResult = null;
-        Step("bindings", () => Bindings.Clear("mode reset / 模式重置"));
         Step("result", () => LoomUI.Instance?.AbortResult("mode reset"));
         CurrentBoss = null;
         bossHms.Clear();
@@ -963,8 +982,7 @@ internal sealed class ModeController : MonoBehaviour
         returnStatue = null;
         if (Hk1Lobby.Active)
         {
-            OnHk1Arrive(scene);
-            StartCoroutine(Hk1FadeGuard(fightSerial));
+            OnHk1Arrive(scene, returningFromFight: true);
         }
         else
         {
@@ -996,7 +1014,7 @@ internal sealed class ModeController : MonoBehaviour
     /// 没从门里出去就回到门前（开门动画没发起转场的 8 秒兜底，Hk1Doors.PendingWatch）就没人淡入，整屏一直黑（自检实测，
     /// 淡入淡出的 FSM 一直停在 Scene Fade Out）。到场 5 秒后还停在那里，就照游戏自己的做法淡入（GameManager.FadeSceneIn）。
     /// </summary>
-    private IEnumerator Hk1FadeGuard(int serial)
+    private IEnumerator Hk1FadeGuard(int serial, string room)
     {
         float t0 = Time.unscaledTime;
         while (Time.unscaledTime - t0 < 5f)
@@ -1005,13 +1023,20 @@ internal sealed class ModeController : MonoBehaviour
             {
                 yield break;
             }
+            // Once control is back in the workshop, a stale native black screen can be lifted.
+            if (room == Hk1Lobby.Workshop && Time.unscaledTime - t0 >= 0.3f
+                && !GameManager.instance.IsInSceneTransition && HeroController.SilentInstance is { acceptingInput: true, controlReqlinquished: false })
+            {
+                break;
+            }
             yield return null;
         }
         GameManager gm = GameManager.instance;
         PlayMakerFSM? fader = gm != null ? gm.screenFader_fsm : null;
-        if (State == LoomState.Lobby && fightSerial == serial && Hk1Lobby.InHub && fader != null && fader.ActiveStateName == "Scene Fade Out" && !gm!.IsInSceneTransition)
+        if (State == LoomState.Lobby && fightSerial == serial && Hk1Lobby.InHub && fader != null && fader.ActiveStateName == "Scene Fade Out"
+            && !gm!.IsInSceneTransition && gm.GetSceneNameString() == room)
         {
-            GodhomePlugin.Log.LogWarning($"[Godhome] 前作神居：回来 5 秒还是黑的（没人淡入），补一次淡入 / hk1 godhome: still faded out 5 s after arriving, fading in（{gm.GetSceneNameString()}）");
+            GodhomePlugin.Log.LogWarning($"[Godhome] Still faded out after entering {room} ({Time.unscaledTime - t0:0.00}s), fading in.");
             gm.FadeSceneIn();
         }
     }
@@ -1254,7 +1279,7 @@ internal sealed class ModeController : MonoBehaviour
         LastPantheonResult = null;
         LastPantheonFail = "";
         pendingResult = null;
-        Bindings.Apply(Run.Bindings, "pantheon " + p.Id);
+        Bindings.Apply(Run.Bindings, GameManager.instance.playerData, "pantheon " + p.Id);
         GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿开始 / pantheon started: {Run}");
         if (redirect != null)
         {
@@ -1313,7 +1338,10 @@ internal sealed class ModeController : MonoBehaviour
         bool rest = run.Def.RestAfter(run.Index) || (DebugTools.Instance != null && DebugTools.Instance.ExtraRest(run));
         try
         {
+            var supply = new RunToolSupply(pd);
             SaveGuard.RestoreKeep(GameManager.instance, "pantheon next / 万神殿下一场");
+            Bindings.ReapplyNeedleLevel(pd);
+            supply.Restore(pd);
         }
         catch (Exception e)
         {
@@ -1342,8 +1370,7 @@ internal sealed class ModeController : MonoBehaviour
         // 不能挪到新场景 FinishedEnteringScene 后，那时新 Boss 的开场可能已经拿走控制。
         heroRecovery.LeaveFight(GameManager.instance, fightSerial, "pantheon next / 万神殿下一场");
         // 血、丝、蓝血和换场前一样（HUD 显示的就是这些），不用刷新 HUD。
-        // 去休息点的话会在长椅回满，不用再带。
-        run.Carry = rest ? null : (pd.health, pd.silk, pd.healthBlue);
+        run.Carry = (pd.health, pd.silk, pd.healthBlue);
         GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿下一场 / pantheon next: {run}，带过去 / carried hp {pd.health}、silk {pd.silk}、blue {pd.healthBlue}{(gearChanged ? "、换过的配装 / changed loadout" : "")}{(rest ? "，先去休息点 / resting first" : "")}");
         if (rest)
         {
@@ -1665,6 +1692,11 @@ internal sealed class ModeController : MonoBehaviour
         {
             return;
         }
+        // The right-hand trapdoor can also restore its own saved open state in Start.
+        if (b.Id == "the_unravelled")
+        {
+            sd.PersistentBools.Remove(b.EntryScene, "Pipe_Vent_Hatch");
+        }
         foreach (string scene in ScenesOf(b))
         {
             foreach (string id in b.BossObjects)
@@ -1947,6 +1979,23 @@ internal sealed class ModeController : MonoBehaviour
     {
         if (State == LoomState.Off)
         {
+            if (info.IsFirstLevelForPlayer && gm.RespawningHero && GodhomeSave.IsGodhome(gm))
+            {
+                // GetRespawnInfo may already have substituted Tut_01 for an imported bench.
+                // Supply the real first scene before loading and keep a vanilla checkpoint on disk.
+                gm.playerData.ResetTempRespawn();
+                GodhomeSave.SetLobbyCheckpoint(gm.playerData);
+                string scene = GodhomeConfig.LobbyScene.Value;
+                string marker = GodhomeConfig.LobbyMarker.Value;
+                if (Hk1Lobby.Decide())
+                {
+                    string? saved = GodhomePlugin.Instance.SaveData?.HubBenchScene;
+                    bool hasBench = saved != null && Hk1Lobby.IsHub(saved);
+                    scene = hasBench ? saved! : Hk1Lobby.Atrium;
+                    marker = hasBench ? Hk1Lobby.BenchMarker(scene) : Hk1Lobby.ArriveMarker;
+                }
+                Redirect(gm, info, scene, marker, respawning: true, "godhome save entry");
+            }
             return;
         }
         // 试验：正在试原生转场进前作场景，放行这一个（Debug.Hk1ProbeMode = native）。
@@ -2082,6 +2131,10 @@ internal sealed class ModeController : MonoBehaviour
                     if (State == LoomState.Won)
                     {
                         // 万神殿：Boss 倒下后游戏自己要切场景（演出、记忆），改道去下一场（或者休息点、结算）。
+                        if (!Run.IsLast)
+                        {
+                            Hk1Battle.PlayRoomChime(SceneManager.GetActiveScene());
+                        }
                         ContinueRun(info);
                         return;
                     }
@@ -2099,6 +2152,7 @@ internal sealed class ModeController : MonoBehaviour
             case LoomState.Rest when Run != null:
                 // 休息点：从任意出口离开就进下一场（休息点场景的出口都改道到下一个战场）。
                 GodhomePlugin.Log.LogInfo($"[Godhome] 离开休息点 / leaving the rest stop → {Run.Current.Id}");
+                Run.Carry = (gm.playerData.health, gm.playerData.silk, gm.playerData.healthBlue);
                 BeginBoss(Run.Current, heal: false, info);
                 return;
             case LoomState.Rest:
@@ -2250,11 +2304,18 @@ internal sealed class ModeController : MonoBehaviour
                     }));
                     break;
                 }
-                // 休息点（真实的长椅房间）：场景状态照常保存（快照护着存档），回满血和丝（照前作：长椅前的休息）。
+                // 回血和补工具仍在到场时做。保留上一场剩余的丝，由长椅的风灵谣恢复。
                 SaveGuard.SuppressLevelState = false;
                 SetState(LoomState.Rest);
                 SetDeathRespawnToLobby();
-                Heal();
+                if (Run.Carry is { } carry)
+                {
+                    gm.playerData.silk = Mathf.Clamp(carry.Silk, 0, gm.playerData.CurrentSilkMax);
+                    HeroController.SilentInstance?.RefreshSilk();
+                    Run.Carry = null;
+                }
+                HeroController.SilentInstance?.MaxHealth();
+                RunToolSupply.RefillAtRest(gm.playerData);
                 GodhomePlugin.Log.LogInfo($"[Godhome] 到了休息点 / at the rest stop: {scene}（下一场 / next {Run.Current.Id}，{Run}）");
                 if (scene == Hk1Lobby.Spa)
                 {

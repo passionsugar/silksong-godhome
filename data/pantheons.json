@@ -1,9 +1,8 @@
 {
-  "$comment": "[Godhome] 万神殿（照前作神居的五个万神殿）。bosses 是 data/bosses.json 里的 id，按出场顺序；rests 是“打完第几个以后去休息点”（从 1 数）；requires 是要先完成的万神殿。名字、说明是我们自己写的，不用前作的文字。束缚参数照前作 BossSequence（骨钉封顶 13、已经低于封顶打八折；最多 5 格血：前作是 4 格，丝之歌一次扣两格的攻击多，4 格满血挨两下就死，0.10.6 实测反馈改成 5），丝之歌没有灵魂，用丝上限 9 代替（刚够一次缚丝回血）。",
+  "$comment": "[Godhome] 万神殿（照前作神居的五个万神殿）。bosses 是 data/bosses.json 里的 id，按出场顺序；rests 是“打完第几个以后去休息点”（从 1 数）；requires 是要先完成的万神殿。名字、说明是我们自己写的，不用前作的文字。织针束缚在连战期间限制织针升级等级（0–4）。最多 5 格血（前作是 4 格，丝之歌一次扣两格的攻击多，4 格满血挨两下就死，0.10.6 实测反馈改成 5），丝之歌没有灵魂，用丝上限 9 代替（刚够一次缚丝回血）。",
   "schemaVersion": 1,
   "bindings": {
-    "needleCap": 13,
-    "needleLowerPercent": 0.8,
+    "needleMaxLevel": 2,
     "maxMasks": 5,
     "maxSilk": 9
   },
@@ -18,8 +17,11 @@
       "name": { "zh": "针师万神殿", "en": "Pantheon of the Needle" },
       "desc": { "zh": "初试锋芒的猎者，在这里重温最初的敌手。", "en": "Where a young hunter relives her first foes." },
       "emblem": "lace_1",
-      "bosses": ["moss_mother", "bell_beast", "fourth_chorus", "savage_beastfly", "sister_splinter", "skull_tyrant", "great_conchflies", "moorwing", "widow", "lace_1"],
-      "rests": [],
+      "bosses": [
+        "moss_mother", "bell_beast", "skull_tyrant", "fourth_chorus", "lace_1", "savage_beastfly",
+        "great_conchflies", "moorwing", "sister_splinter", "widow", "phantom", "last_judge"
+      ],
+      "rests": [6],
       "requires": []
     },
     {
@@ -27,8 +29,11 @@
       "name": { "zh": "伶人万神殿", "en": "Pantheon of the Performer" },
       "desc": { "zh": "伶人与狂徒登台，为织忆献上一出出戏。", "en": "Players and zealots take the stage for the Loom." },
       "emblem": "trobbio",
-      "bosses": ["phantom", "last_judge", "forebrothers", "gurr", "lugoli", "groal", "crawfather", "voltvyrm", "raging_conchfly", "trobbio"],
-      "rests": [],
+      "bosses": [
+        "garmond_zaza", "cogwork_dancers", "trobbio", "voltvyrm", "lugoli", "cogwork_clapper",
+        "plasmified_zango", "crawfather", "broodmother", "raging_conchfly", "groal", "forebrothers"
+      ],
+      "rests": [6],
       "requires": []
     },
     {
@@ -36,8 +41,11 @@
       "name": { "zh": "歌者万神殿", "en": "Pantheon of the Singer" },
       "desc": { "zh": "圣堡的歌声里，藏着最难缠的对手。", "en": "Within the Citadel's song wait its fiercest foes." },
       "emblem": "lace_2",
-      "bosses": ["father_of_the_flame", "broodmother", "first_sinner", "cogwork_dancers", "the_unravelled", "second_sentinel", "savage_beastfly_2", "shakra", "garmond_zaza", "lace_2"],
-      "rests": [],
+      "bosses": [
+        "bell_eater", "gurr", "father_of_the_flame", "watcher_at_the_edge", "the_unravelled", "shakra",
+        "second_sentinel", "pinstress", "first_sinner", "lace_2", "grand_mother_silk"
+      ],
+      "rests": [6],
       "requires": []
     },
     {
@@ -45,8 +53,11 @@
       "name": { "zh": "守望万神殿", "en": "Pantheon of the Watcher" },
       "desc": { "zh": "守在天涯尽头的强者，静候来者。", "en": "The strong who keep watch at the edges, waiting." },
       "emblem": "hunter_queen",
-      "bosses": ["clover_dancers", "palestag", "nyleth", "crust_king_khann", "seth", "pinstress", "watcher_at_the_edge", "bell_eater", "plasmified_zango", "karmelita"],
-      "rests": [],
+      "bosses": [
+        "summoned_saviour", "lost_garmond", "tormented_trobbio", "palestag", "seth",
+        "clover_dancers", "nyleth", "crust_king_khann", "karmelita", "lost_lace"
+      ],
+      "rests": [5],
       "requires": []
     },
     {
@@ -55,12 +66,16 @@
       "desc": { "zh": "纺络的一切记忆，一线不断。", "en": "All of Pharloom's memories, in one unbroken thread." },
       "emblem": "100_percent",
       "bosses": [
-        "moss_mother", "bell_beast", "fourth_chorus", "savage_beastfly", "sister_splinter", "skull_tyrant", "great_conchflies", "moorwing", "widow", "lace_1", "phantom", "last_judge",
-        "forebrothers", "gurr", "lugoli", "groal", "crawfather", "father_of_the_flame", "voltvyrm", "raging_conchfly", "broodmother", "first_sinner", "cogwork_dancers", "trobbio",
-        "the_unravelled", "second_sentinel", "savage_beastfly_2", "shakra", "garmond_zaza", "lace_2", "clover_dancers", "palestag", "nyleth", "crust_king_khann", "seth", "pinstress",
-        "watcher_at_the_edge", "bell_eater", "plasmified_zango", "karmelita", "skull_tyrant_invasion", "moss_mother_duo", "tormented_trobbio", "lost_garmond", "summoned_saviour", "grand_mother_silk", "lost_lace"
+        "moss_mother_duo", "bell_beast", "skull_tyrant_invasion", "fourth_chorus", "lace_1", "savage_beastfly_2",
+        "great_conchflies", "moorwing", "sister_splinter", "widow", "phantom", "last_judge",
+        "garmond_zaza", "cogwork_dancers", "trobbio", "voltvyrm", "lugoli", "cogwork_clapper",
+        "plasmified_zango", "crawfather", "broodmother", "raging_conchfly", "groal", "forebrothers",
+        "bell_eater", "gurr", "father_of_the_flame", "watcher_at_the_edge", "the_unravelled", "shakra",
+        "second_sentinel", "pinstress", "first_sinner", "lace_2", "grand_mother_silk",
+        "summoned_saviour", "lost_garmond", "tormented_trobbio", "palestag", "seth",
+        "clover_dancers", "nyleth", "crust_king_khann", "karmelita", "lost_lace"
       ],
-      "rests": [12, 24, 36],
+      "rests": [6, 12, 18, 24, 30, 35, 40],
       "requires": ["p1", "p2", "p3", "p4"]
     }
   ]

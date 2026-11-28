@@ -50,12 +50,12 @@
 
 | 前作 | 本作 | 效果（0.8.0 实装） | 做法 |
 |---|---|---|---|
-| 骨钉 | 织针束缚 | 伤害封顶 13；本来就不超过 13 的打八折（照前作 `BoundNailDamage`）。满级织针 21 → 13 | 补丁 `PlayerData.nailDamage` 的 getter，`BossSequenceController.BoundNail` / `BoundNailDamage` 也一起补 |
+| 骨钉 | 织针束缚 | 织针在连战中至多二级，普通针击和依赖织针的丝技都按实际等级结算 | 临时限制实时 `PlayerData.nailUpgrades`，每次换场恢复快照后重新套用，退出时恢复原等级 |
 | 外壳 | 面具束缚 | 最多 5 格血（原来照前作“比起始少一格”是 4 格；丝之歌一次扣两格的攻击多，4 格挨两下就死，0.10.6 实测反馈改成 5） | `PlayerData.CurrentMaxHealth` 自己会看 `BoundShell`：补丁 `BoundShell` / `BoundMaxHealth` |
 | 护符 | 工具束缚 | 所有工具（红、蓝、黄）都不算装备，纹章不动；存档里的装备不改 | 补丁 `ToolItemManager.IsToolEquipped`（两个重载） |
 | 灵魂 | 灵丝束缚 | 丝上限压到 9（刚够一次缚丝回血） | 补丁 `PlayerData.CurrentSilkMaxBasic` / `CurrentSilkMax` |
 
-参数在 `data/pantheons.json` 的 `bindings` 里（needleCap 13、needleLowerPercent 0.8、maxMasks 4、maxSilk 9）。束缚只在连战期间生效，结束、作废、回标题都会解开。
+参数在 `data/pantheons.json` 的 `bindings` 里（needleMaxLevel 2、maxMasks 5、maxSilk 9）。束缚只在连战期间生效，结束、作废、回标题都会解开。
 
 完成记录：完成 / 用过的每种束缚 / 全束缚 / 无伤，存在神居存档的插件记录里（不写游戏存档字段）。
 

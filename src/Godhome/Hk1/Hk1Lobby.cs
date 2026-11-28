@@ -16,7 +16,7 @@ namespace Godhome;
 /// Boss 场地不搬，打的都是本作的 Boss（雕像、门接到本作的 Boss 和万神殿上，见 Hk1Hall、Hk1Doors）。
 ///
 /// 存档里的复活点始终是本作的场景（织忆圣所的长椅，见 SaveSanitizePatch），没有前作或插件时读档照样能进；
-/// 有前作时一进来就转到前厅。
+/// 启用前作时，读档直接进入最近一次坐过长椅的大厅房间，首次进入落在前厅。
 /// </summary>
 internal static class Hk1Lobby
 {
@@ -30,7 +30,7 @@ internal static class Hk1Lobby
     /// <summary>前作每个 Boss 场景（包括温泉）都有的入口门（前作 BossSequenceController 进下一场就走它）。</summary>
     internal const string DreamEnterGate = "door_dreamEnter";
 
-    /// <summary>前厅里死亡、读档后醒来的地方（前作在神居里死亡也是在这里醒来）。长椅是前作的 FSM，坐上去未必起得来，不用。</summary>
+    /// <summary>前厅里默认的落点。还没坐过大厅长椅的存档也从这里进。</summary>
     internal const string ArriveMarker = "Death Respawn Marker";
 
     /// <summary>前作雕像、门的回程门名的前缀（BossStatue.Awake / BossSequenceDoor.Start 把物体名接在后面）。</summary>
@@ -47,6 +47,8 @@ internal static class Hk1Lobby
     internal static bool Active { get; private set; }
 
     internal static bool IsHub(string scene) => Array.IndexOf(Hub, scene) >= 0;
+
+    internal static string BenchMarker(string scene) => scene == Atrium ? "RestBench" : "RestBench (1)";
 
     /// <summary>是不是搬过来的前作场景（神居三个房间或温泉）。存档里不能写这些场景名（SaveSanitizePatch）。</summary>
     internal static bool IsHk1Scene(string? scene) => scene != null && Array.IndexOf(All, scene) >= 0;
@@ -179,12 +181,11 @@ internal static class Hk1Lobby
         m.respawnFacingRight = true;
     }
 
-    /// <summary>前作神居里能不能交互（我们的界面开着、搭建没完成时不行）。</summary>
+    /// <summary>挑战或结算界面占用交互。</summary>
     internal static bool InteractionBlocked =>
-        LoomUI.Instance != null && (LoomUI.Instance.ChallengeBusy || LoomUI.Instance.ResultBusy) || Hk1Hall.Busy;
+        LoomUI.Instance != null && (LoomUI.Instance.ChallengeBusy || LoomUI.Instance.ResultBusy);
 
-    /// <summary>大厅准备好了（结算、自检等它）：在前作神居里、手办屋的雕像换好了。</summary>
-    internal static bool Ready => InHub && !Hk1Hall.Busy;
+    internal static bool Ready => InHub;
 
     /// <summary>
     /// 前作的 FSM 走到一半被我们截走（开战、开万神殿）：它关掉的暂停、拿走的操作还回来，
@@ -279,6 +280,16 @@ internal static class Hk1Lobby
         }
         GameObject[] roots = scene.GetRootGameObjects();
         (int triggers, int debug, int fsms) = Sanitize(roots);
+        foreach (RespawnMarker marker in roots.SelectMany(r => r.GetComponentsInChildren<RespawnMarker>(true))
+            .Where(m => m.name == BenchMarker(scene.name) || m.name == ArriveMarker))
+        {
+            marker.customFadeDuration ??= new TeamCherry.SharedUtils.OverrideFloat();
+            marker.overrideMapZone ??= new OverrideMapZone();
+        }
+        if (scene.name == Roof)
+        {
+            Hk1RoofPlatform.Prepare(roots);
+        }
         // 前作的“离开神居”（前厅左边的梦境出口）：织忆圣所没有出口。
         foreach (GameObject r in roots.Where(r => r.name == "Dream Exit Warp"))
         {
@@ -412,7 +423,10 @@ internal static class Hk1Lobby
     internal static void OnArrive(string scene)
     {
         GodhomePlugin.Log.LogInfo($"[Godhome] 前作神居：到了 {scene}（到现在醒来时改过的 FSM / fsms fixed on awake so far: {awakeFixed}，按模板重建的 / template inits {Hk1TemplatePromptPatch.calls}，提示 / prompt prefab {(PromptPrefab() != null ? "ok" : "-")}）");
-        LogCameras(SceneManager.GetActiveScene());
+        if (GodhomeConfig.DebugMode.Value)
+        {
+            LogCameras(SceneManager.GetActiveScene());
+        }
         if (scene == Workshop)
         {
             Hk1Hall.OnArrive();
@@ -489,10 +503,25 @@ internal static class Hk1Lobby
             {
                 continue;
             }
+            // Only the gate used for this return reaches these states. Its own
+            // "Gotten Up" action re-enables the correct statue's Inspect object.
+            if (pm.gameObject.scene.name == Workshop && pm.FsmName == "Return from boss"
+                && st.Name is "Transition In" or "Get Up Wait" && !acts.Any(a => a is Hk1StatueReturnReady))
+            {
+                string next = st.Name == "Transition In" ? "DREAM WAKE" : "FINISHED";
+                acts = acts.Concat(new[] { new Hk1StatueReturnReady { EventName = next } }).ToArray();
+                changed = true;
+            }
             for (int i = 0; i < acts.Length; i++)
             {
                 FsmStateAction a = acts[i];
-                if (a is ShowPromptMarker spm && (spm.prefab?.Value == null || NeedsOurPrompt(spm.prefab.Value)))
+                if (pm.FsmName == "Bench Control" && st.Name == "Save Game"
+                    && a is HutongGames.PlayMaker.Actions.SendMessage save && save.functionCall?.FunctionName == "SaveGame")
+                {
+                    acts[i] = new Hk1SaveBench();
+                    changed = true;
+                }
+                else if (a is ShowPromptMarker spm && (spm.prefab?.Value == null || NeedsOurPrompt(spm.prefab.Value)))
                 {
                     acts[i] = new Hk1ShowPrompt { Label = spm.labelName, SpawnPoint = spm.spawnPoint, Store = spm.storeObject };
                     changed = true;
@@ -594,6 +623,26 @@ internal static class Hk1Lobby
         {
             GodhomePlugin.Log.LogWarning($"[Godhome] 记镜头出错 / camera log failed: {e.Message}");
         }
+    }
+}
+
+/// <summary>Bridge the HK1 wake event once Silksong has returned control to the player.</summary>
+internal sealed class Hk1StatueReturnReady : FsmStateAction
+{
+    public string EventName = "";
+
+    public override void OnUpdate()
+    {
+        GameManager gm = GameManager.UnsafeInstance;
+        HeroController hero = HeroController.SilentInstance;
+        if (ModeController.Instance?.State != LoomState.Lobby || gm == null || !GodhomeSave.IsGodhome(gm) || gm.IsInSceneTransition
+            || gm.GameState != GlobalEnums.GameState.PLAYING || Hk1Lobby.InteractionBlocked
+            || hero == null || !hero.acceptingInput || hero.controlReqlinquished || !hero.CanInteract())
+        {
+            return;
+        }
+        Finish();
+        Fsm.Event(FsmEvent.GetFsmEvent(EventName));
     }
 }
 

@@ -162,7 +162,7 @@ internal static class CreateSaveGameDataPatch
 /// 前作神居（分支 hk1-godhome）：存档里的复活点不能是前作的场景（没有前作或插件时读档进不去），
 /// 写盘前（PreparePlayerDataForSave，SaveGame / CreateSaveGameData 经过它；GetSaveGameData 把同样的代码抄了一份、不经过它，
 /// 游戏自己不调 GetSaveGameData，只有别的模组会用。战斗中写的是换进来的快照）
-/// 把前作神居的复活点换回织忆圣所的长椅；读档后落在长椅，有前作就马上转去前厅（ModeController）。
+/// 把前作神居的复活点换回织忆圣所的长椅。ModeController 在读档的第一次转场中选择实际落点。
 /// </summary>
 [HarmonyPatch(typeof(GameManager), "PreparePlayerDataForSave")]
 internal static class SaveSanitizePatch
@@ -180,9 +180,7 @@ internal static class SaveSanitizePatch
         if (Hk1Lobby.IsHk1Scene(pd.respawnScene))
         {
             was += $" respawn {pd.respawnScene}@{pd.respawnMarkerName}";
-            pd.respawnScene = lobby;
-            pd.respawnMarkerName = marker;
-            pd.respawnType = 1;
+            GodhomeSave.SetLobbyCheckpoint(pd);
         }
         if (Hk1Lobby.IsHk1Scene(pd.tempRespawnScene))
         {

@@ -106,17 +106,17 @@
 | `crust_king_khann` | 壳王卡汗 | Crust King Khann | Boss | 忆境 | `Memory_Coral_Tower` | `Memory_Coral_Tower @ (50.6, 558.1)` | 1650 | `defeatedCoralKing` |
 | `karmelita` | 斯卡尔歌后卡梅莉塔 | Skarrsinger Karmelita | Boss | 忆境 | `Memory_Ant_Queen` | `Memory_Ant_Queen @ (149.0, 21.1)` | 1500 | `defeatedAntQueen` |
 | `seth` | 圣所守卫者赛斯 | Shrine Guardian Seth | Boss | 壳木林 | `Shellwood_22` | `Shellwood_22 @ (104.8, 10.5)` | 1185 | `defeatedSeth` |
-| `lost_garmond` | 失心加蒙德 | Lost Garmond | Boss | 风蚀长阶 | `Coral_33` | `Coral_33 @ (23.7, 66.5)` | 900 | `garmondBlackThreadDefeated` |
+| `lost_garmond` | 失心加蒙德 | Lost Garmond | Boss | 风蚀长阶 | `Coral_33` | `Coral_33 @ (29.5, 62.0)` | 900 | `garmondBlackThreadDefeated` |
 | `plasmified_zango` | 生质异化的赞戈 | Plasmified Zango | Boss | 沙噬虫道 | `Crawl_10` | `Crawl_10 @ (16.8, 8.0)` | 1000 | `待查` |
-| `pinstress` | 针姬 | Pinstress | Boss | 雪灵山 | `Peak_07` | `Peak_07 @ (38.0, 87.4)` | 910 | `待查` |
+| `pinstress` | 针姬 | Pinstress | Boss | 雪灵山 | `Peak_07` | `Peak_07 @ (32.0, 87.4)` | 910 | `待查` |
 | `watcher_at_the_edge` | 边陲守望者 | Watcher at the Edge | Boss | 卡拉卡沙川 | `Coral_39` | `Coral_39 @ (137.0, 9.5)` | 900 | `defeatedGreyWarrior` |
-| `bell_eater` | 噬钟者 | Bell Eater | Boss | 钟心镇 | `Bellway_Centipede_Arena` | `Bellway_Centipede_Arena @ (146.5, 8.0)` | 400 / 400 | `待查` |
+| `bell_eater` | 噬钟者 | Bell Eater | Boss | 钟心镇 | `Bellway_Centipede_Arena` | `Bellway_Centipede_Arena @ (138.75, 8.0)` | 400 / 400 | `待查` |
 | `summoned_saviour` | 蒙召救主 | Summoned Saviour | Boss | 髓骨洞窟 | `Bone_Steel_Servant` | `Bone_Steel_Servant @ (26.5, 6.5)` | 500 | `待查` |
 | `tormented_trobbio` | 痛苦的特罗比奥 | Tormented Trobbio | Boss | 圣堡 | `Library_13` | `Library_13 @ (69.5, 15.6)` | 950 | `defeatedTormentedTrobbio` |
 | `skull_tyrant_invasion` | 颅骨暴君（入侵骸底镇） | Skull Tyrant (Bone Bottom Invasion) | Boss | 骸底镇 | `Bonetown_boss<br>← Bonetown` | `Bonetown @ (235.6, 9.0)` | 450 | `skullKingKilled` |
 | `moss_mother_duo` | 苔藓之母（织巢双生） | Moss Mother (Weavenest Pair) | Boss | 阿特拉织巢 | `Weave_03` | `Weave_03 @ (4.3, 21.6)` | 350 / 350 | `待查` |
 | `huge_flea` | 巨蚤 | Huge Flea | 小 Boss | 圣堡 | `Arborium_08` | `Arborium_08 @ (33.7, 34.5)` | 200 | `tamedGiantFlea` |
-| `lost_lace` | 失心蕾丝 | Lost Lace | Boss | 深渊 | `Abyss_Cocoon` | `Abyss_Cocoon @ (46.0, 8.0)` | 1800 | `待查` |
+| `lost_lace` | 失心蕾丝 | Lost Lace | Boss | 深渊 | `Abyss_Cocoon` | `Abyss_Cocoon @ (41.6, 8.0)` | 1800 | `待查` |
 
 ## 难点
 

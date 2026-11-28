@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -16,7 +18,7 @@ namespace Godhome;
 ///   按精灵自己的网格三角形把像素画出来（不管图集怎么打包、旋转都对）。
 /// - 雕刻：颜色压成一种石料；原画的细黑线当刻痕，大块黑色当深色石料；透明度模糊出体积，按左上方的光打出浮雕明暗；
 ///   边缘压暗、迎光的外缘一道亮边；石头颗粒。
-/// - 结果是我们自己生成的贴图和精灵（不改游戏的任何东西），按立绘缓存，回标题时销毁。
+/// - 生成的像素和摆放参数写入本地缓存，回标题时只释放 Unity 贴图、精灵。
 /// </summary>
 internal static class StatueCarver
 {
@@ -78,19 +80,32 @@ internal static class StatueCarver
     /// <summary>这次搭建雕了几尊、失败几尊、几轮、用时（日志、巡视用）。</summary>
     internal static string Note { get; private set; } = "";
 
-    private static int sessOk, sessFailed, sessRounds;
+    private static int sessOk, sessFailed, sessRounds, sessLoaded;
     private static float sessStart;
+    private static string? diskDirectory;
 
     /// <summary>一次搭建开始雕（可能分几轮调 CarveAll）。</summary>
     internal static void BeginSession()
     {
-        sessOk = sessFailed = sessRounds = 0;
+        sessOk = sessFailed = sessRounds = sessLoaded = 0;
         sessStart = Time.realtimeSinceStartup;
+        if (cacheDark != Dark) ReleaseAll();
+        cacheDark = Dark;
+        try
+        {
+            diskDirectory = StatueDiskCache.DirectoryFor(BepInEx.Paths.CachePath,
+                Application.buildGUID + "/" + Application.version + "/" + QualitySettings.activeColorSpace, cacheDark);
+        }
+        catch (Exception e)
+        {
+            diskDirectory = null;
+            StatueDiskCache.Warn(e);
+        }
     }
 
     internal static void EndSession()
     {
-        Note = $"石像 / statues carved: {sessOk}，失败 / failed {sessFailed}，{sessRounds} 轮 / round(s)，{Time.realtimeSinceStartup - sessStart:0.00}s，缓存共 / cached {cache.Count}";
+        Note = $"石像 / statues carved: {sessOk}，磁盘读取 / disk hits {sessLoaded}，失败 / failed {sessFailed}，{sessRounds} 轮 / round(s)，{Time.realtimeSinceStartup - sessStart:0.00}s，缓存共 / cached {cache.Count}";
         GodhomePlugin.Log.LogInfo($"[Godhome] {Note}");
     }
 
@@ -102,23 +117,53 @@ internal static class StatueCarver
     /// <summary>已经雕好的石像（没雕过或没雕成返回 null，不在这里同步雕）。石头换了（前作神居用不了、退回圣所）不算雕好。</summary>
     internal static Sprite? Get(string? key) => key != null && cacheDark == Dark && cache.TryGetValue(key, out Sprite? s) ? s : null;
 
+    internal static IEnumerator Restore(string[] keys, Func<bool> alive, Action<string> restored)
+    {
+        string? dir = diskDirectory;
+        if (keys.Length == 0 || dir == null) yield break;
+        // Bound decoded pixels in flight; a room can contain fifty distinct forms.
+        const int batchSize = 8;
+        for (int i = 0; i < keys.Length && alive(); i += batchSize)
+        {
+            var batch = new ArraySegment<string>(keys, i, Math.Min(batchSize, keys.Length - i));
+            var read = Task.Run(() => StatueDiskCache.Read(dir, batch));
+            while (!read.IsCompleted && alive()) yield return null;
+            if (!alive()) yield break;
+            if (read.IsFaulted)
+            {
+                StatueDiskCache.Warn(read.Exception!.GetBaseException());
+                yield break;
+            }
+            float frameStart = Time.realtimeSinceStartup;
+            foreach (var pair in read.Result)
+            {
+                if (!alive()) yield break;
+                try
+                {
+                    if (Get(pair.Key) == null)
+                    {
+                        cache[pair.Key] = CreateSprite(pair.Key, pair.Value);
+                        sessLoaded++;
+                    }
+                }
+                catch (Exception e) { StatueDiskCache.Warn(e); }
+                if (Get(pair.Key) != null) restored(pair.Key);
+                if (Time.realtimeSinceStartup - frameStart >= 0.004f)
+                {
+                    yield return null;
+                    frameStart = Time.realtimeSinceStartup;
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// 把这些画都雕好（已经雕好的跳过）。同一页贴图只拷一次；每雕几尊让一帧。alive 返回 false 就停。
     /// 只缓存雕成的：没雕成的这次由调用方换下一个候选，下次搭建还会再试（Codex 审查 v0.6.3 #3/#4）。
     /// </summary>
-    internal static IEnumerator CarveAll(IEnumerable<Source> sources, Func<bool> alive)
+    internal static IEnumerator CarveAll(IEnumerable<Source> sources, Func<bool> alive, Action<string>? onCarved)
     {
         float t0 = Time.realtimeSinceStartup;
-        // 缓存是另一种石头雕的（前作神居中途用不了，退回圣所）：作废重雕，不拿暗石头的放进圣所（Codex 审查）。
-        if (cacheDark != Dark)
-        {
-            if (cache.Count > 0)
-            {
-                GodhomePlugin.Log.LogInfo($"[Godhome] 石头换了，石像重雕 / statue stone changed (dark={Dark}), re-carving");
-                ReleaseAll();
-            }
-            cacheDark = Dark;
-        }
         var todo = new List<Source>();
         foreach (Source s in sources)
         {
@@ -136,10 +181,10 @@ internal static class StatueCarver
         int ok = 0, failed = 0;
         RenderTexture? rt = null;
         Texture? page = null;
-        RenderTexture? prev = RenderTexture.active;
         try
         {
             float frameStart = Time.realtimeSinceStartup;
+            float frameBudget = onCarved != null ? 0.004f : 0.012f;
             foreach (Source src in todo)
             {
                 if (!alive())
@@ -147,6 +192,7 @@ internal static class StatueCarver
                     break;
                 }
                 Sprite? carved = null;
+                RenderTexture? prev = RenderTexture.active;
                 try
                 {
                     Texture tex = src.Texture;
@@ -155,7 +201,6 @@ internal static class StatueCarver
                         // 换页：先还旧的并清空引用，新的分配、拷好以后才算数（Codex 审查 v0.6.3 低 #1）。
                         if (rt != null)
                         {
-                            RenderTexture.active = prev;
                             RenderTexture.ReleaseTemporary(rt);
                             rt = null;
                             page = null;
@@ -171,19 +216,22 @@ internal static class StatueCarver
                 {
                     GodhomePlugin.Log.LogWarning($"[Godhome] 雕石像失败 / statue carving failed for {src.Key}: {e.Message}");
                 }
+                finally
+                {
+                    RenderTexture.active = prev;
+                }
                 if (carved != null)
                 {
                     cache[src.Key] = carved;
+                    onCarved?.Invoke(src.Key);
                     ok++;
                 }
                 else
                 {
                     failed++;
                 }
-                // 一帧最多花 12 毫秒（黑幕挡着，但别让游戏卡住）。
-                if (Time.realtimeSinceStartup - frameStart > 0.012f)
+                if (Time.realtimeSinceStartup - frameStart >= frameBudget)
                 {
-                    RenderTexture.active = prev;
                     yield return null;
                     frameStart = Time.realtimeSinceStartup;
                 }
@@ -191,7 +239,6 @@ internal static class StatueCarver
         }
         finally
         {
-            RenderTexture.active = prev;
             if (rt != null)
             {
                 RenderTexture.ReleaseTemporary(rt);
@@ -327,26 +374,42 @@ internal static class StatueCarver
         {
             return Carve(src, rt, Mathf.Min(4f, MinPixels / (float)Mathf.Max(1, solidLong)));
         }
-        var outPx = new Color32[tw * th];
+        var rgba = new byte[tw * th * 4];
         for (int y = 0; y < th; y++)
         {
-            Array.Copy(full, (y + y0) * w + x0, outPx, y * tw, tw);
+            MemoryMarshal.AsBytes(full.AsSpan((y + y0) * w + x0, tw)).CopyTo(rgba.AsSpan(y * tw * 4));
         }
-        var tex = new Texture2D(tw, th, TextureFormat.RGBA32, false, false)
+        float ox = Pad - b.min.x * ppu - x0, oy = Pad - b.min.y * ppu - y0;
+        var image = new StatuePixels(tw, th, ox / tw, oy / th, ppu, rgba);
+        Sprite sprite = CreateSprite(src.Key, image);
+        if (diskDirectory != null) StatueDiskCache.QueueWrite(diskDirectory, src.Key, image);
+        return sprite;
+    }
+
+    private static Sprite CreateSprite(string key, StatuePixels image)
+    {
+        var tex = new Texture2D(image.Width, image.Height, TextureFormat.RGBA32, false, false)
         {
-            name = "Godhome Statue " + src.Key,
+            name = "Godhome Statue " + key,
             filterMode = FilterMode.Bilinear,
             wrapMode = TextureWrapMode.Clamp,
             hideFlags = HideFlags.DontSave,
         };
-        tex.SetPixels32(outPx);
-        tex.Apply(false, true);
-        made.Add(tex);
-        // 轴心放在原精灵的原点上（和原立绘的世界位置一致）；摆放代码按包围盒算，不依赖它。
-        float ox = Pad - b.min.x * ppu - x0, oy = Pad - b.min.y * ppu - y0;
-        Sprite sp = Sprite.Create(tex, new Rect(0, 0, tw, th), new Vector2(ox / tw, oy / th), ppu, 0, SpriteMeshType.FullRect);
-        sp.name = "Statue " + src.Key;
-        return sp;
+        try
+        {
+            tex.LoadRawTextureData(image.Rgba);
+            tex.Apply(false, true);
+            Sprite sp = Sprite.Create(tex, new Rect(0, 0, image.Width, image.Height),
+                new Vector2(image.PivotX, image.PivotY), image.Ppu, 0, SpriteMeshType.FullRect);
+            sp.name = "Statue " + key;
+            made.Add(tex);
+            return sp;
+        }
+        catch
+        {
+            Object.Destroy(tex);
+            throw;
+        }
     }
 
     /// <summary>

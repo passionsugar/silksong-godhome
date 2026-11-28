@@ -49,8 +49,8 @@
     "BIND_MASK":  "面具",
     "BIND_TOOLS":  "工具",
     "BIND_SILK":  "灵丝",
-    "BIND_DESC_NEEDLE":  "织针束缚：伤害最多 {0}，本来就不超过 {0} 的再减两成",
+    "BIND_DESC_NEEDLE":  "连战期间，织针等级最高为 {0} 级",
     "BIND_DESC_MASK":  "面具束缚：最多 {0} 格面具",
     "BIND_DESC_TOOLS":  "工具束缚：所有工具都失去作用",
-    "BIND_DESC_SILK":  "灵丝束缚：灵丝轴最多 {0} 格"
+    "BIND_DESC_SILK":  "灵丝轴最多 {0} 格。普通缚丝回 2 格，多重缚丝器先回 1 格，再回 2 格"
 }

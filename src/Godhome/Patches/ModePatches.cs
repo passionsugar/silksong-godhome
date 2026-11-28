@@ -80,6 +80,28 @@ internal static class FinishedEnteringScenePatch
     private static void Postfix() => ModeController.Instance?.OnSceneEntered();
 }
 
+[HarmonyPatch(typeof(HeroController), "FinishedEnteringScene")]
+internal static class ArenaEntryMotionPatch
+{
+    private static void Prefix(HeroController __instance)
+    {
+        if (ModeController.Instance?.State != LoomState.ToFight || Arena.Door == null
+            || __instance.sceneEntryGate != Arena.Door || !GodhomeSave.IsGodhome(GameManager.UnsafeInstance))
+        {
+            return;
+        }
+        // This is a standing arena entrance, even when the previous exit was
+        // crossed sprinting. The native finish otherwise waits for a continuing
+        // sprint/dash/dive to give control back in the destination.
+        __instance.ResetSceneExitedStates();
+        if (__instance.enterWithoutInput && !__instance.controlReqlinquished && __instance.HasAnimationControl
+            && !__instance.IsInputBlocked() && !__instance.cState.isInCutsceneMovement)
+        {
+            __instance.EnterWithoutInput(false);
+        }
+    }
+}
+
 /// <summary>
 /// 模板 FSM 第一次激活时 Awake 按模板新建一份 Fsm（PlayMakerFSM.InitTemplate），加载时打的补丁、插的结束动作会丢；
 /// 醒来后让场地重打一次（Arena.OnFsmAwake 只认这一场加载时改过的模板 FSM，别的直接返回）。
@@ -91,6 +113,7 @@ internal static class FsmAwakePatch
     {
         Arena.OnFsmAwake(__instance);
         Hk1Lobby.OnFsmAwake(__instance);
+        PantheonRestBench.Configure(__instance);
     }
 }
 

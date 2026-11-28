@@ -39,11 +39,10 @@ internal sealed class PantheonDef
     public bool RestAfter(int index) => Rests.Contains(index + 1) && index + 1 < Bosses.Count;
 }
 
-/// <summary>束缚的参数（照前作 BossSequence 的 nailDamage / lowerNailDamagePercentage / maxHealth；丝上限是丝之歌的灵魂束缚）。</summary>
+/// <summary>连战束缚下的织针等级、面具和灵丝上限。</summary>
 internal sealed class BindingParams
 {
-    public int NeedleCap = 13;
-    public float NeedleLowerPercent = 0.8f;
+    public int NeedleMaxLevel = 2;
     public int MaxMasks = 5;
     public int MaxSilk = 9;
 }
@@ -83,8 +82,7 @@ internal static class PantheonCatalog
         {
             Bindings = new BindingParams
             {
-                NeedleCap = Mathf.Clamp(Int(bj["needleCap"]) ?? 13, 1, 999),
-                NeedleLowerPercent = Mathf.Clamp(Float(bj["needleLowerPercent"]) ?? 0.8f, 0.05f, 1f),
+                NeedleMaxLevel = Mathf.Clamp(Int(bj["needleMaxLevel"]) ?? 2, 0, 4),
                 MaxMasks = Mathf.Clamp(Int(bj["maxMasks"]) ?? 5, 1, 20),
                 MaxSilk = Mathf.Clamp(Int(bj["maxSilk"]) ?? 9, 1, 99),
             };
@@ -151,20 +149,11 @@ internal static class PantheonCatalog
             }
         }
         All = list;
-        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿 / pantheons: {string.Join("，", list.Select(p => $"{p.Id} {p.Bosses.Count}"))}；束缚 / bindings: 织针封顶 {Bindings.NeedleCap}（以下 ×{Bindings.NeedleLowerPercent}），面具 {Bindings.MaxMasks}，丝 {Bindings.MaxSilk}；休息点 / rest {RestScene}@{RestMarker}");
+        GodhomePlugin.Log.LogInfo($"[Godhome] 万神殿 / pantheons: {string.Join("，", list.Select(p => $"{p.Id} {p.Bosses.Count}"))}；束缚 / bindings: 织针等级上限 {Bindings.NeedleMaxLevel}，面具 {Bindings.MaxMasks}，丝 {Bindings.MaxSilk}；休息点 / rest {RestScene}@{RestMarker}");
     }
 
     private static string? Str(JToken? o, string key) => o is JObject j && j[key] is JValue v && v.Type == JTokenType.String ? (string?)v : null;
 
     private static int? Int(JToken? t) => t is JValue v && (v.Type == JTokenType.Integer || v.Type == JTokenType.Float) ? (int)Math.Round(Convert.ToDouble(v.Value)) : null;
 
-    private static float? Float(JToken? t)
-    {
-        if (t is JValue v && (v.Type == JTokenType.Integer || v.Type == JTokenType.Float))
-        {
-            double d = Convert.ToDouble(v.Value);
-            return double.IsNaN(d) || double.IsInfinity(d) ? null : (float)d;
-        }
-        return null;
-    }
 }

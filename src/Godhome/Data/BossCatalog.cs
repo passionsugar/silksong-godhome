@@ -110,6 +110,9 @@ internal sealed class FsmStep
     /// </summary>
     public string When = "";
 
+    // The native trigger may have fired before the arrival steps run.
+    public string SkipWhen = "";
+
     /// <summary>只用于 debug.react：在 when 状态里停了至少这么多秒才执行（0 = 一进去就执行）。</summary>
     public float After;
 
@@ -132,6 +135,10 @@ internal sealed class FsmStep
 /// <summary>[Godhome] 一个 Boss 的神居场地（bosses.json 的 arena 段，见 docs/arena.md）。</summary>
 internal sealed class ArenaDef
 {
+    // Explicit encounter overrides, keyed by a name from bossObjects. Top-level hp is the vanilla inventory.
+    public readonly Dictionary<string, int> StartingHealth = new();
+    // World-space combat limits for the hero (left, bottom, right, top). The floor stays native.
+    public Rect? PlayerBounds;
     /// <summary>入场门 door_dreamEnter 的位置（世界坐标）。门型入口只用 x 和往下找地面，y 写在地面上方一点。</summary>
     public Vector2? Door;
 
@@ -204,7 +211,7 @@ internal sealed class FsmRef
     public string Path = "";
     public string Fsm = "";
     public string State = "";
-    /// <summary>只执行神居判胜，清除该状态的原动作和后续跳转，避免继续进入原版结局。</summary>
+    /// <summary>在此判胜并截断后续跳转。默认保留此状态的攻击清理动作。</summary>
     public bool Terminal;
 
     public override string ToString() => $"{Path}::{Fsm} [{State}]{(Terminal ? " (terminal)" : "")}";
@@ -217,6 +224,8 @@ internal sealed class FsmRef
 /// </summary>
 internal sealed class ArenaPatch
 {
+    public int HpThreshold;
+    public int? HealAmount;
     public string Type = "";
     public string Path = "";
     public string Fsm = "";
@@ -239,7 +248,10 @@ internal sealed class ArenaPatch
         "start" => $"{Path}::{Fsm} start → '{State}'",
         "goto" => $"{Path}::{Fsm} [{From}] {Event} → '{To}'",
         "var" => $"{Path}::{Fsm} {ValueType} {Name} = {Value}",
+        "hpCheck" => $"{Path}::{Fsm} [{State}] HP threshold {HpThreshold}",
         "actionLast" => $"{Path}::{Fsm} [{State}] {Name} → 最后 / last",
+        "actionFirst" => $"{Path}::{Fsm} [{State}] {Name} → first",
+        "holdInput" => $"{Path}::{Fsm} [{State}] block hero input",
         _ => $"{Type} {Path}",
     };
 }
@@ -341,6 +353,25 @@ internal static class BossCatalog
         if (o["arena"] is JObject arena)
         {
             b.Arena = ParseArena(arena, id);
+            if (arena["health"] is JToken health)
+            {
+                if (health is not JObject targets)
+                {
+                    b.Arena.Broken = "arena.health must map bossObjects to positive HP";
+                }
+                else
+                {
+                    foreach (JProperty target in targets.Properties())
+                    {
+                        if (!b.BossObjects.Contains(target.Name) || PositiveInt(target.Value) is not int hp)
+                        {
+                            b.Arena.Broken = $"invalid arena.health target or HP: {target.Name}";
+                            break;
+                        }
+                        b.Arena.StartingHealth.Add(target.Name, hp);
+                    }
+                }
+            }
         }
         if ((o["prerequisites"] as JObject)?["playerData"] is JObject pd)
         {
@@ -376,7 +407,7 @@ internal static class BossCatalog
         "entry", "bossObjects", "hp", "flags", "prerequisites", "allowScenes", "journal", "statueArt", "arena", "debug", "notes",
     };
     private static readonly HashSet<string> EntryKeys = new() { "scene" };
-    private static readonly HashSet<string> ArenaKeys = new() { "$comment", "door", "face", "wake", "encountered", "patch", "skipWaves", "end", "enter", "keep", "challenge", "noAdditive", "hudGrace" };
+    private static readonly HashSet<string> ArenaKeys = new() { "$comment", "door", "face", "wake", "encountered", "patch", "skipWaves", "end", "enter", "keep", "challenge", "noAdditive", "hudGrace", "playerBounds", "health" };
     private static readonly HashSet<string> DebugKeys = new() { "$comment", "kill", "timeout", "killInterval", "killAdds", "react", "holdKill" };
 
     private static void Unknown(JObject? o, HashSet<string> known, string id, string prefix)
@@ -429,6 +460,7 @@ internal static class BossCatalog
                 State = Str(s, "state") ?? "",
                 Delay = Clamp(Num(s["delay"]), 0f, 60f, 0f),
                 When = Str(s, "when") ?? "",
+                SkipWhen = Str(s, "skipWhen") ?? "",
                 After = Clamp(Num(s["after"]), 0f, 60f, 0f),
                 Required = Bool(s, "required"),
             };
@@ -455,6 +487,19 @@ internal static class BossCatalog
     private static ArenaDef ParseArena(JObject arena, string id)
     {
         var a = new ArenaDef();
+        if (arena["playerBounds"] is JToken bounds)
+        {
+            if (bounds is JArray box && box.Count == 4 && Num(box[0]) is float left
+                && Num(box[1]) is float bottom && Num(box[2]) is float right && Num(box[3]) is float top
+                && left < right && bottom < top)
+            {
+                a.PlayerBounds = Rect.MinMaxRect(left, bottom, right, top);
+            }
+            else
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] {id}: arena.playerBounds must be [left, bottom, right, top]");
+            }
+        }
         if (arena["door"] is JArray d && d.Count >= 2 && Num(d[0]) is float x && Num(d[1]) is float y)
         {
             a.Door = new Vector2(x, y);
@@ -530,7 +575,10 @@ internal static class BossCatalog
         return a;
     }
 
-    private static readonly HashSet<string> PatchTypes = new() { "start", "goto", "var", "activate", "deactivate", "actionLast" };
+    private static int? PositiveInt(JToken? t) =>
+        t is JValue { Type: JTokenType.Integer, Value: long n } && n is > 0 and <= int.MaxValue ? (int)n : null;
+
+    private static readonly HashSet<string> PatchTypes = new() { "start", "goto", "var", "activate", "deactivate", "actionLast", "actionFirst", "holdInput", "hpCheck" };
 
     private static List<ArenaPatch> Patches(JToken? t, string id)
     {
@@ -552,6 +600,8 @@ internal static class BossCatalog
                 Event = Str(s, "event") ?? "",
                 To = Str(s, "to") ?? "",
                 Name = Str(s, "name") ?? "",
+                HpThreshold = PositiveInt(s["threshold"]) ?? 0,
+                HealAmount = PositiveInt(s["heal"]),
                 Required = Bool(s, "required"),
             };
             if (s["required"] is JToken rq && rq.Type != JTokenType.Boolean)
@@ -592,7 +642,10 @@ internal static class BossCatalog
                 "goto" when p.From.Length == 0 || p.Event.Length == 0 || p.To.Length == 0 => "goto 要写 from、event、to",
                 "var" when valueBad != null => valueBad,
                 "var" when p.Name.Length == 0 || p.ValueType.Length == 0 => "var 要写 name 和 bool / int / float / string 之一",
-                "actionLast" when p.State.Length == 0 || p.Name.Length == 0 => "actionLast 要写 state 和 name（动作的类型名）",
+                "actionLast" or "actionFirst" when p.State.Length == 0 || p.Name.Length == 0 => "动作排序要写 state 和 name",
+                "holdInput" when p.State.Length == 0 => "holdInput 要写 state",
+                "hpCheck" when p.State.Length == 0 || p.HpThreshold == 0 || (s["heal"] != null && p.HealAmount == null)
+                    => "hpCheck needs a state, positive threshold and optional positive heal",
                 _ => null,
             };
             if (bad != null)

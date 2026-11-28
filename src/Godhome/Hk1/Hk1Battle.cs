@@ -66,6 +66,10 @@ internal static class Hk1Battle
     private static Scene coverScene;
 
     private static Runner? runner;
+    private const string RoomChime = "gg_room_transition";
+    private static AudioClip? roomClip;
+    private static AudioSource? roomSource;
+    private static int? lastChimeScene;
 
     /// <summary>能放：在用前作神居，预制体已经取到。</summary>
     internal static bool Usable
@@ -605,6 +609,17 @@ internal static class Hk1Battle
     /// <summary>照前作 EventRegister.SendEvent 发事件，只发给这个特效：它自己订了这个事件的 EventRegister 收；一个都没有就直接发给它的 FSM。</summary>
     private static void Send(GameObject go, string ev)
     {
+        if (ev == EvOut)
+        {
+            // Replace only this instance's room cue. The final and statue
+            // sequences keep their original sound actions.
+            PlayAudioEvent? cue = MainOf(go)?.Fsm.GetState("Out")?.Actions.OfType<PlayAudioEvent>()
+                .FirstOrDefault(a => a.audioClip?.Value is AudioClip clip && clip.name == RoomChime);
+            if (cue != null && PlayRoomChime(go.scene, cue))
+            {
+                cue.Enabled = false;
+            }
+        }
         int byRegister = 0;
         foreach (EventRegister er in go.GetComponentsInChildren<EventRegister>(true))
         {
@@ -631,6 +646,61 @@ internal static class Hk1Battle
     {
         Retire(go, "drop");
         go = null;
+    }
+
+    // A defeated boss with its own exit cutscene can bypass Out.
+    // A source on the persistent runner lets the tail ring into the next scene.
+    internal static bool PlayRoomChime(Scene scene, PlayAudioEvent? cue = null)
+    {
+        try
+        {
+            if (!Usable)
+            {
+                return false;
+            }
+            if (lastChimeScene == scene.handle)
+            {
+                return true;
+            }
+            if (cue?.audioClip?.Value is AudioClip clip)
+            {
+                roomClip = clip;
+            }
+            if (roomClip == null)
+            {
+                // The loaded transition prefab holds the clip even when its Out
+                // state has never run (e.g. a boss that starts its own scene load).
+                roomClip = Resources.FindObjectsOfTypeAll<AudioClip>().FirstOrDefault(c => c != null && c.name == RoomChime);
+            }
+            if (roomClip == null)
+            {
+                GodhomePlugin.Log.LogWarning($"[Godhome] Room chime unavailable in {scene.name}: {RoomChime} was not loaded");
+                return false;
+            }
+            if (roomSource == null)
+            {
+                AudioSource prefab = GlobalSettings.Audio.Default2DAudioSourcePrefab;
+                if (prefab == null)
+                {
+                    GodhomePlugin.Log.LogWarning($"[Godhome] Room chime unavailable in {scene.name}: no 2D audio source prefab");
+                    return false;
+                }
+                roomSource = Run().gameObject.AddComponent<AudioSource>();
+                roomSource.playOnAwake = false;
+                roomSource.spatialBlend = 0f;
+                roomSource.outputAudioMixerGroup = prefab.outputAudioMixerGroup;
+            }
+            roomSource.pitch = cue == null ? 1f : UnityEngine.Random.Range(cue.pitchMin.Value, cue.pitchMax.Value);
+            roomSource.PlayOneShot(roomClip, cue?.volume.Value ?? 1f);
+            lastChimeScene = scene.handle;
+            GodhomePlugin.Log.LogInfo($"[Godhome] Room chime: {scene.name} / {roomClip.name}");
+            return true;
+        }
+        catch (Exception e)
+        {
+            GodhomePlugin.Log.LogWarning($"[Godhome] Room chime unavailable: {e.GetBaseException().Message}");
+            return false;
+        }
     }
 
     /// <summary>调试开着：第一次放的时候把特效的层级、FSM 写到 BepInEx\Godhome\hk1-battle-transitions.txt（调时间、核对事件用）。</summary>
@@ -735,6 +805,7 @@ internal static class Hk1Battle
     internal static void Clear()
     {
         Drop(ref cover);
+        lastChimeScene = null;
     }
 
     private static Runner Run()

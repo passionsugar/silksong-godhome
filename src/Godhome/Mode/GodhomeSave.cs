@@ -93,14 +93,18 @@ internal static class GodhomeSave
     {
         pd.bossRushMode = true;
         pd.permadeathMode = GlobalEnums.PermadeathModes.Off;
-        pd.respawnScene = GodhomeConfig.LobbyScene.Value;
-        pd.respawnMarkerName = GodhomeConfig.LobbyMarker.Value;
-        // 1 = 在长椅上醒来（HeroController.cs:7215）。
-        pd.respawnType = 1;
+        SetLobbyCheckpoint(pd);
         int n = ApplyFields(pd);
         pd.health = pd.maxHealth;
         justCreated = pd;
         GodhomePlugin.Log.LogInfo($"[Godhome] 新建神居存档 / new godhome save: respawn {pd.respawnScene} @ {pd.respawnMarkerName}, {n} 个满配字段 / kit fields set, masks {pd.maxHealthBase}, silk {pd.silkMax}");
+    }
+
+    internal static void SetLobbyCheckpoint(PlayerData pd)
+    {
+        pd.respawnScene = GodhomeConfig.LobbyScene.Value;
+        pd.respawnMarkerName = GodhomeConfig.LobbyMarker.Value;
+        pd.respawnType = 1;
     }
 
     /// <summary>
