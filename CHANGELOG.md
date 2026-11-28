@@ -2,6 +2,12 @@
 
 Newest first. Release archives and full notes: https://github.com/passionsugar/silksong-godhome/releases
 
+## 0.10.8 (unreleased)
+
+- Reworked all five Pantheon routes, added Cogwork Clapper to Pantheons II and V, and adjusted health for 14 boss encounters.
+- Updated Needle and Silk bindings, tool supplies and rest benches. Fixed arena boundaries, boss introductions and Phantom's phase threshold.
+- Improved Hall of Gods statue placement and return interactions, cached statue artwork across game launches, and fixed hub checkpoints and save-slot presentation.
+
 ## 0.10.7 (2026-11-27)
 
 Fixes and changes from player testing, update recommended. Saves need no changes.
