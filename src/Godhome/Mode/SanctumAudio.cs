@@ -25,7 +25,6 @@ internal static class SanctumAudio
 {
     private const string Group = "sfxstatic_assets_areabone";
     private const string LeverClipPath = "Assets/Audio/SFX/Props/bone_switch.wav";
-    private static readonly Regex BundleKey = new(@"^sfxstatic_assets_areabone(_[0-9a-f]{32})?\.bundle$", RegexOptions.IgnoreCase);
 
     private static IResourceLocation? location;
 
@@ -58,7 +57,7 @@ internal static class SanctumAudio
         }
         int gen = generation;
         float t0 = Time.realtimeSinceStartup;
-        Locate();
+        location ??= GameAssetBundle.Find(Group);
         if (location == null)
         {
             Note = $"音效 / sfx: 找不到音效包 / bundle not in the catalog: {Group}";
@@ -212,24 +211,26 @@ internal static class SanctumAudio
         }
     }
 
-    private static void Locate()
+}
+
+internal static class GameAssetBundle
+{
+    // Catalogs may use either the bundle filename or a filename with its content hash.
+    internal static IResourceLocation? Find(string group)
     {
-        if (location != null)
-        {
-            return;
-        }
+        var bundleKey = new Regex("^" + Regex.Escape(group) + @"(_[0-9a-f]{32})?\.bundle$", RegexOptions.IgnoreCase);
         try
         {
             foreach (IResourceLocator locator in Addressables.ResourceLocators)
             {
                 foreach (object key in locator.Keys)
                 {
-                    if (key is not string k || k.IndexOf(Group, StringComparison.OrdinalIgnoreCase) < 0)
+                    if (key is not string k || k.IndexOf(group, StringComparison.OrdinalIgnoreCase) < 0)
                     {
                         continue;
                     }
                     string leaf = k.Substring(Math.Max(k.LastIndexOf('/'), k.LastIndexOf('\\')) + 1);
-                    if (!BundleKey.IsMatch(leaf))
+                    if (!bundleKey.IsMatch(leaf))
                     {
                         continue;
                     }
@@ -240,15 +241,15 @@ internal static class SanctumAudio
                     IResourceLocation? bl = locs.FirstOrDefault(l => l != null && typeof(IAssetBundleResource).IsAssignableFrom(l.ResourceType));
                     if (bl != null)
                     {
-                        location = bl;
-                        return;
+                        return bl;
                     }
                 }
             }
         }
         catch (Exception e)
         {
-            GodhomePlugin.Log.LogWarning($"[Godhome] 查音效包目录出错 / sfx catalog scan failed: {e.Message}");
+            GodhomePlugin.Log.LogWarning($"[Godhome] Bundle lookup failed for {group}: {e.Message}");
         }
+        return null;
     }
 }

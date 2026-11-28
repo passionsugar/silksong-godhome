@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
+using HutongGames.PlayMaker;
+using HutongGames.PlayMaker.Actions;
 using UnityEngine;
 
 namespace Godhome;
@@ -10,7 +14,7 @@ internal enum Binding
 {
     None = 0,
 
-    /// <summary>织针束缚（前作骨钉）：伤害封顶，已经不超过封顶就打八折。</summary>
+    /// <summary>织针束缚：连战期间织针最多二级。</summary>
     Needle = 1,
 
     /// <summary>面具束缚（前作外壳）：最多几格血。</summary>
@@ -19,7 +23,7 @@ internal enum Binding
     /// <summary>工具束缚（前作护符）：所有工具（红、蓝、黄）都不算装备；丝技（白色）照前作护符束缚不管法术，照常能放。</summary>
     Tools = 4,
 
-    /// <summary>灵丝束缚（前作灵魂）：丝上限压低。</summary>
+    /// <summary>灵丝束缚：压低丝上限，每次缚丝少回一格。</summary>
     Silk = 8,
 
     All = Needle | Mask | Tools | Silk,
@@ -27,11 +31,10 @@ internal enum Binding
 
 /// <summary>
 /// [Godhome] 万神殿的束缚。只在一次万神殿连战期间生效（ModeController 开始时 Apply、结束或作废时 Clear），
-/// 不改存档数据，全部用补丁在读取的地方改结果（存档里的升级、装备都原样留着）：
+/// 开战前的快照负责存档，束缚只作用于连战中的实时数据。
 ///
-/// - 织针：PlayerData.nailDamage 是按升级算的属性（5/9/13/17/21），丝之歌的织针伤害（DamageEnemies、HealthManager、
-///   SetNailDamage）都直接读它，所以补丁它的 getter。前作留下的 GetNailDamage 动作看 BossSequenceController.BoundNail /
-///   BoundNailDamage，也一起补上。
+/// - 织针：临时限制 nailUpgrades，由游戏按该等级计算基础伤害、敌人受伤系数和依赖织针的丝技。
+///   前作留下的 GetNailDamage 动作也能通过 BoundNailDamage 取得实时针伤。
 /// - 面具：PlayerData.CurrentMaxHealth 本来就是“BoundShell 时取 Min(maxHealth, BoundMaxHealth)”（前作的逻辑还在），
 ///   但 BoundShell / BoundMaxHealth 读的是前作的连战数据（丝之歌里没人设，BoundMaxHealth 直接读会空引用）。
 ///   补丁这两个：束缚时 BoundShell = true、BoundMaxHealth = 上限。HUD 面具上前作的 GGCheckBoundHeart 也看这两个。
@@ -45,14 +48,26 @@ internal enum Binding
 /// </summary>
 internal static class Bindings
 {
+    private static PlayerData? needleOwner;
+    private static int originalNeedleLevel;
+
     internal static Binding Active { get; private set; }
+
+    internal static bool NeedleBound => needleOwner != null && ReferenceEquals(needleOwner, PlayerData.instance);
 
     internal static bool Has(Binding b) => (Active & b) != 0;
 
     /// <summary>开始连战时（快照拍好以后）套上束缚；血和丝超出新上限的压下来。</summary>
-    internal static void Apply(Binding b, string why)
+    internal static void Apply(Binding b, PlayerData pd, string why)
     {
+        RestoreNeedleLevel();
         Active = b & Binding.All;
+        if (Has(Binding.Needle) && GodhomeSave.IsGodhome(pd))
+        {
+            needleOwner = pd;
+            originalNeedleLevel = pd.nailUpgrades;
+            ReapplyNeedleLevel(pd);
+        }
         GodhomePlugin.Log.LogInfo($"[Godhome] 束缚 / bindings: {Describe(Active)}（{why}）");
         Refresh();
     }
@@ -65,6 +80,7 @@ internal static class Bindings
             return;
         }
         Active = Binding.None;
+        RestoreNeedleLevel();
         GodhomePlugin.Log.LogInfo($"[Godhome] 解开束缚 / bindings cleared（{why}）");
         Refresh();
     }
@@ -89,11 +105,22 @@ internal static class Bindings
     /// <summary>丝技（白色）：工具束缚不管它。</summary>
     internal static bool IsSkill(ToolItem? tool) => tool != null && tool.Type == ToolItemType.Skill;
 
-    /// <summary>织针束缚下的伤害（照前作 BossSequenceController.BoundNailDamage）。</summary>
-    internal static int NeedleDamage(int raw)
+    /// <summary>换场时快照会拷回原等级。只给本次连战的实时 PlayerData 重新套用束缚。</summary>
+    internal static void ReapplyNeedleLevel(PlayerData pd)
     {
-        BindingParams p = PantheonCatalog.Bindings;
-        return raw <= p.NeedleCap ? Mathf.Max(1, Mathf.RoundToInt(raw * p.NeedleLowerPercent)) : p.NeedleCap;
+        if (ReferenceEquals(pd, needleOwner))
+        {
+            pd.nailUpgrades = Math.Min(originalNeedleLevel, PantheonCatalog.Bindings.NeedleMaxLevel);
+        }
+    }
+
+    private static void RestoreNeedleLevel()
+    {
+        if (needleOwner != null)
+        {
+            needleOwner.nailUpgrades = originalNeedleLevel;
+            needleOwner = null;
+        }
     }
 
     /// <summary>束缚变了：工具缓存、HUD 刷新；血、丝超出上限的压下来。</summary>
@@ -144,24 +171,12 @@ internal static class Bindings
     }
 }
 
-[HarmonyPatch(typeof(PlayerData), nameof(PlayerData.nailDamage), MethodType.Getter)]
-internal static class BindNeedleDamagePatch
-{
-    private static void Postfix(ref int __result)
-    {
-        if (Bindings.Has(Binding.Needle))
-        {
-            __result = Bindings.NeedleDamage(__result);
-        }
-    }
-}
-
 [HarmonyPatch(typeof(BossSequenceController), nameof(BossSequenceController.BoundNail), MethodType.Getter)]
 internal static class BindNeedleFlagPatch
 {
     private static bool Prefix(ref bool __result)
     {
-        if (Bindings.Has(Binding.Needle))
+        if (Bindings.NeedleBound)
         {
             __result = true;
             return false;
@@ -170,15 +185,15 @@ internal static class BindNeedleFlagPatch
     }
 }
 
-/// <summary>GetNailDamage 动作取 Min(nailDamage, BoundNailDamage)：nailDamage 已经补丁过，这里直接给同一个值（不能再算一次八折）。</summary>
+/// <summary>旧版 GetNailDamage 动作也使用当前织针等级对应的原生伤害。</summary>
 [HarmonyPatch(typeof(BossSequenceController), nameof(BossSequenceController.BoundNailDamage), MethodType.Getter)]
 internal static class BindNeedleValuePatch
 {
     private static bool Prefix(ref int __result)
     {
-        if (Bindings.Has(Binding.Needle))
+        if (Bindings.NeedleBound)
         {
-            __result = PlayerData.instance != null ? PlayerData.instance.nailDamage : Bindings.NeedleDamage(5);
+            __result = PlayerData.instance.nailDamage;
             return false;
         }
         return true;
@@ -280,6 +295,58 @@ internal static class BindSilkPatch
         if (Bindings.Has(Binding.Silk))
         {
             __result = Mathf.Min(__result, PantheonCatalog.Bindings.MaxSilk);
+        }
+    }
+}
+
+// hornet_bind calls AddHealth with the same "Heal Amount" variable for both
+// Multibinder pulses. Is First Loop is set anew by the game for every bind.
+[HarmonyPatch(typeof(CallMethodProper), "DoMethodCall")]
+internal static class BindSilkHealPatch
+{
+    private static bool Prefix(CallMethodProper __instance)
+    {
+        if (!Bindings.Has(Binding.Silk) || __instance.methodName?.Value != nameof(HeroController.AddHealth)
+            || __instance.behaviour?.Value != nameof(HeroController)
+            || __instance.State.Name is not ("Heal" or "Leave Scene Bind?")
+            || __instance.parameters?.Length != 1
+            || __instance.parameters[0] is not { useVariable: true, variableName: "Heal Amount" })
+        {
+            return true;
+        }
+        Fsm fsm = __instance.Fsm;
+        HeroController hero = HeroController.SilentInstance;
+        if (hero == null || fsm.GetOwnerDefaultTarget(__instance.gameObject) != hero.gameObject
+            || fsm.Variables.FindFsmBool("Is First Loop")?.Value != true)
+        {
+            return true;
+        }
+        int? amount = fsm.Variables.FindFsmInt("Heal Amount")?.Value;
+        if (amount is not (2 or 3))
+        {
+            return true;
+        }
+        hero.AddHealth(amount.Value - 1);
+        return false;
+    }
+}
+
+// Beast and Witch crests heal one mask per successful hit during a bind.
+// Reduce the number of eligible hits without changing when those hits pay out.
+[HarmonyPatch]
+internal static class BindSilkCrestHealCapPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(HeroController), nameof(HeroController.GetRageModeHealCap));
+        yield return AccessTools.Method(typeof(HeroController), nameof(HeroController.GetWitchHealCap));
+    }
+
+    private static void Postfix(ref int __result)
+    {
+        if (Bindings.Has(Binding.Silk) && __result is 3 or 4)
+        {
+            __result--;
         }
     }
 }

@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using HutongGames.PlayMaker;
+using CallMethodProper = HutongGames.PlayMaker.Actions.CallMethodProper;
+using CompareHP = HutongGames.PlayMaker.Actions.CompareHP;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
@@ -152,6 +154,7 @@ internal static class Arena
 
     internal static void Clear()
     {
+        ArenaIntroInput.ReleaseAll();
         boss = null;
         onBossesDead = null;
         onComplete = null;
@@ -229,9 +232,19 @@ internal static class Arena
                 GodhomePlugin.Log.LogError($"[Godhome] 场地准备出错 / arena prepare error ({b.Id}, {scene.name}, {what}): {e}");
             }
         }
+        // sceneLoaded precedes Start. Native Init states (including secondary FSMs) now
+        // derive their thresholds from the encounter HP, even on initially inactive bosses.
+        if (scene.name == b.Scene && b.Arena.StartingHealth.Count > 0)
+        {
+            Step("boss HP", () => ApplyStartingHealth(b, roots));
+        }
         if (scene.name == b.EntryScene && Door == null)
         {
             Step("door", () => BuildDoor(b, scene));
+        }
+        if (scene.name == b.EntryScene && b.Arena.PlayerBounds is Rect bounds)
+        {
+            Step("combat bounds", () => BuildPlayerBounds(scene, bounds));
         }
         Step("exits", () => CloseExits(scene, roots));
         Step("interactables", () => ClearInteractables(b, roots));
@@ -244,6 +257,33 @@ internal static class Arena
             Step("controller", () => BuildController(b, scene, roots));
         }
         GodhomePlugin.Log.LogInfo($"[Godhome] 场地 / arena {b.Id} @ {scene.name}（加载时 / at load）：{Summary}");
+    }
+
+    private static void ApplyStartingHealth(BossDef b, GameObject[] roots)
+    {
+        var targets = b.Arena.StartingHealth;
+        var found = new HashSet<string>();
+        // Awake caches hp for RefillHP. Some scene objects have already awakened, while
+        // inactive ones will cache the new hp themselves when the battle activates them.
+        FieldInfo initialHp = typeof(HealthManager).GetField("initHp", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+            ?? throw new MissingFieldException(nameof(HealthManager), "initHp");
+        foreach (GameObject root in roots)
+        {
+            foreach (HealthManager hm in root.GetComponentsInChildren<HealthManager>(true))
+            {
+                string name = CleanName(hm.gameObject.name);
+                if (targets.TryGetValue(name, out int hp))
+                {
+                    initialHp.SetValue(hm, hp);
+                    hm.hp = hp;
+                    found.Add(name);
+                }
+            }
+        }
+        if (found.Count != targets.Count)
+        {
+            throw new InvalidOperationException($"missing HP targets: {string.Join(", ", targets.Keys.Except(found))}");
+        }
     }
 
     /// <summary>
@@ -279,6 +319,28 @@ internal static class Arena
         tp.entryPoint = "";
         go.SetActive(true);
         Door = tp;
+    }
+
+    private static void BuildPlayerBounds(Scene scene, Rect bounds)
+    {
+        const float thickness = 2f;
+        float half = thickness / 2f;
+        void AddWall(string side, Vector2 center, Vector2 size)
+        {
+            // This layer collides with Hornet's body and is outside enemy terrain casts.
+            var wall = new GameObject("Godhome Player Boundary " + side) { layer = (int)GlobalEnums.PhysLayers.HERO_DETECTOR };
+            SceneManager.MoveGameObjectToScene(wall, scene);
+            wall.transform.position = center;
+            var collider = wall.AddComponent<BoxCollider2D>();
+            collider.size = size;
+            collider.excludeLayers = ~(1 << (int)GlobalEnums.PhysLayers.PLAYER);
+            WallsBuilt++;
+        }
+
+        var sideSize = new Vector2(thickness, bounds.height);
+        AddWall("Left", new Vector2(bounds.xMin - half, bounds.center.y), sideSize);
+        AddWall("Right", new Vector2(bounds.xMax + half, bounds.center.y), sideSize);
+        AddWall("Top", new Vector2(bounds.center.x, bounds.yMax + half), new Vector2(bounds.width + 2f * thickness, thickness));
     }
 
     /// <summary>
@@ -636,6 +698,38 @@ internal static class Arena
         }
     }
 
+    private static string ApplyHpCheck(ArenaPatch p, FsmState? state)
+    {
+        if (state == null)
+        {
+            return Bad($"no HP check state '{p.State}'");
+        }
+        CompareHP? check = state.Actions.OfType<CompareHP>().SingleOrDefault(a => a.Enabled);
+        if (check?.integer2 == null)
+        {
+            return Bad("expected a CompareHP threshold");
+        }
+        if (check.integer2.UseVariable && (p.Name.Length == 0 || check.integer2.Name != p.Name))
+        {
+            return Bad($"unexpected CompareHP threshold variable '{check.integer2.Name}'");
+        }
+        if (p.HealAmount is int amount)
+        {
+            var heal = state.Actions.OfType<CallMethodProper>().SingleOrDefault(a =>
+                a.Enabled && a.behaviour.Value == nameof(HealthManager) && a.methodName.Value == nameof(HealthManager.AddHP));
+            if (heal?.parameters is not { Length: 2 } args
+                || args.Any(v => v == null || v.useVariable || v.Type != VariableType.Int))
+            {
+                return Bad("expected AddHP(amount, cap) with literal integers");
+            }
+            args[0].intValue = amount;
+            args[1].intValue = p.HpThreshold;
+        }
+        // Replace this comparison's operand. Init can still write to the original FSM variable.
+        check.integer2 = new FsmInt(p.HpThreshold);
+        return "ok";
+    }
+
     private static string ApplyPatch(ArenaPatch p, GameObject go)
     {
         switch (p.Type)
@@ -721,6 +815,31 @@ internal static class Arena
                 t.ToFsmState = to;
                 return "ok";
             }
+            case "hpCheck":
+                if (!f.Initialized)
+                {
+                    f.InitData();
+                }
+                return ApplyHpCheck(p, f.GetState(p.State));
+            case "holdInput":
+                if (!f.Initialized)
+                {
+                    f.InitData();
+                }
+                foreach (string stateName in p.State.Split('|'))
+                {
+                    FsmState? target = f.GetState(stateName);
+                    if (target == null)
+                    {
+                        return Bad($"no intro state '{stateName}'");
+                    }
+                    if (!target.Actions.Any(a => a is ArenaIntroInput))
+                    {
+                        target.Actions = new FsmStateAction[] { new ArenaIntroInput() }.Concat(target.Actions).ToArray();
+                    }
+                }
+                return "ok";
+            case "actionFirst":
             case "actionLast":
             {
                 // 把状态里的某个动作挪到最后（name 是动作的类型名，取第一个启用的）。
@@ -741,13 +860,15 @@ internal static class Arena
                 {
                     return Bad($"状态里没有启用的 / no enabled action '{p.Name}' (has: {string.Join(", ", st.Actions.Select(a => a?.GetType().Name))})");
                 }
-                if (idx == st.Actions.Length - 1)
+                bool first = p.Type == "actionFirst";
+                if (idx == (first ? 0 : st.Actions.Length - 1))
                 {
-                    return "已经在最后 / already last";
+                    return "ok (already in position)";
                 }
                 FsmStateAction moved = st.Actions[idx];
-                st.Actions = st.Actions.Where((_, i) => i != idx).Concat(new[] { moved }).ToArray();
-                return $"ok（第 / from {idx + 1}/{st.Actions.Length} 挪到最后 / moved last）";
+                var rest = st.Actions.Where((_, i) => i != idx);
+                st.Actions = (first ? rest.Prepend(moved) : rest.Append(moved)).ToArray();
+                return $"ok (moved from {idx + 1}/{st.Actions.Length} to {(first ? "first" : "last")})";
             }
             case "var":
             {
@@ -1086,7 +1207,48 @@ internal static class Arena
             && hero != null && HeroController.SilentInstance == hero && !hero.cState.dead
             && entryDoor != null && Door == entryDoor;
         host.StartCoroutine(Arrive(host, b, Same));
+        host.StartCoroutine(RestoreEntryInput(gm!, hero, Same));
         return true;
+    }
+
+    // AcceptInput can return early while the hero is still being positioned.
+    // Check again after entry, including when an intro releases its own control.
+    private static IEnumerator RestoreEntryInput(GameManager gm, HeroController hero, Func<bool> same)
+    {
+        float entryTime = 0f, readyTime = 0f, inputOffTime = 0f;
+        while (same() && entryTime < 12f && readyTime < 2f)
+        {
+            yield return null;
+            if (!same())
+            {
+                yield break;
+            }
+            var c = hero.cState;
+            if (gm.IsGamePaused() || c.isPaused)
+            {
+                inputOffTime = 0f;
+                continue;
+            }
+            entryTime += Time.unscaledDeltaTime;
+            if (!hero.isHeroInPosition || !c.onGround || c.transitioning || c.dead || c.hazardDeath || c.hazardRespawning
+                || hero.transitionState != GlobalEnums.HeroTransitionState.WAITING_TO_TRANSITION || gm.IsInSceneTransition
+                || gm.RespawningHero || gm.GameState != GlobalEnums.GameState.PLAYING
+                || c.isInCutsceneMovement || hero.controlReqlinquished || !hero.HasAnimationControl || hero.IsInputBlocked()
+                || gm.playerData.disablePause || gm.playerData.atBench || gm.playerData.isInventoryOpen
+                || InteractManager.BlockingInteractable != null || Hk1Lobby.InteractionBlocked)
+            {
+                readyTime = inputOffTime = 0f;
+                continue;
+            }
+            readyTime = hero.acceptingInput ? readyTime + Time.unscaledDeltaTime : 0f;
+            inputOffTime = hero.acceptingInput ? 0f : inputOffTime + Time.unscaledDeltaTime;
+            if (inputOffTime >= 0.1f)
+            {
+                hero.AcceptInput();
+                GodhomePlugin.Log.LogInfo($"[Godhome] Restored arena entry input in {gm.GetSceneNameString()}");
+                yield break;
+            }
+        }
     }
 
     private static readonly MethodInfo? BattleSceneEnter = AccessTools.Method(typeof(BattleScene), "OnTriggerEnter2D");
@@ -1436,14 +1598,23 @@ internal static class Arena
                 while (same() && waited < 15f)
                 {
                     fsm = SceneTools.FindFsm(s.Path, s.Fsm, scenes);
-                    if (fsm != null && fsm.gameObject.activeInHierarchy && SceneTools.InState(fsm, s.When))
+                    if (fsm != null && !Paused() && (AlreadyAdvanced(fsm)
+                        || (fsm.isActiveAndEnabled && SceneTools.InState(fsm, s.When))))
                     {
                         break;
                     }
                     yield return new WaitForSeconds(0.2f);
                     waited += 0.2f;
                 }
-                if (fsm == null || !SceneTools.InState(fsm, s.When))
+                if (!same())
+                {
+                    yield break;
+                }
+                if (fsm != null && AlreadyAdvanced(fsm))
+                {
+                    continue;
+                }
+                if (fsm == null || !fsm.isActiveAndEnabled || !SceneTools.InState(fsm, s.When))
                 {
                     GodhomePlugin.Log.LogWarning($"[Godhome]   进场步骤没等到状态 / enter step: {s.Path}::{s.Fsm} never reached '{s.When}' (now '{fsm?.ActiveStateName ?? "-"}')");
                     if (s.Required && same())
@@ -1468,6 +1639,9 @@ internal static class Arena
                 MarkFatal(serial, $"必需的进场步骤没执行成 / a required enter step failed: {s}");
                 yield break;
             }
+
+            bool AlreadyAdvanced(PlayMakerFSM fsm) =>
+                s.SkipWhen.Length != 0 && SceneTools.InState(fsm, s.SkipWhen);
         }
     }
 

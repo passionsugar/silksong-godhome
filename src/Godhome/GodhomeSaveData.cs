@@ -9,6 +9,10 @@ public sealed class GodhomeSaveData
 {
     public int Version { get; set; } = 1;
 
+    public string? HubBenchScene { get; set; }
+
+    public bool RoofShortcutOpened { get; set; }
+
     /// <summary>Boss id → 记录。</summary>
     public Dictionary<string, BossRecord> Bosses { get; set; } = new();
 

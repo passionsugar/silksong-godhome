@@ -12,7 +12,7 @@ namespace Godhome;
 
 /// <summary>
 /// [Godhome] 用前作神居时，万神殿的休息点照前作是温泉 GG_Spa（重新打包的前作场景，从前作 Boss 场景都有的 door_dreamEnter 进来）。
-/// 到了回满血和丝（ModeController 照旧做），从出口走出去就进下一场（FilterTransition 改道）。
+/// 到场回血、补工具，坐上长椅后由风灵谣恢复丝。从出口走出去就进下一场。
 ///
 /// 温泉里有前作的场景控制器（BossSceneController，丝之歌里还有这个类）：
 /// - 照前作 BossSequenceController 进下一场前设好 SetupEvent，不然 Awake 去读存档里的前作连战（currentBossSequence）、报错；
@@ -26,6 +26,7 @@ internal static class Hk1Spa
     private static readonly AccessTools.FieldRef<BossSceneController, bool> RestoreField = AccessTools.FieldRefAccess<BossSceneController, bool>("restoreBindingsOnDestroy");
     private static readonly AccessTools.FieldRef<BossSceneController, bool> DoTransitionField = AccessTools.FieldRefAccess<BossSceneController, bool>("doTransition");
     private static readonly AccessTools.FieldRef<BossSceneController, bool> SubscribedField = AccessTools.FieldRefAccess<BossSceneController, bool>("knightDamagedSubscribed");
+    private static readonly AccessTools.FieldRef<TransitionPoint, bool> SkipSceneMapCheck = AccessTools.FieldRefAccess<TransitionPoint, bool>("skipSceneMapCheck");
 
     /// <summary>温泉能用：在用前作神居、温泉打包好了。</summary>
     internal static bool Usable
@@ -87,7 +88,7 @@ internal static class Hk1Spa
     }
 
     /// <summary>温泉刚加载完（Awake 已跑、Start 没跑，人还没进来）：照前作神居的房间处理，盖上前作的转场特效。</summary>
-    internal static void Prepare(Scene scene)
+    internal static void Prepare(Scene scene, BossDef? nextBoss)
     {
         ClearSetup();
         GameObject[] roots = scene.GetRootGameObjects();
@@ -102,13 +103,19 @@ internal static class Hk1Spa
         {
             var setRespawn = bench.FsmVariables.FindFsmBool("Set Respawn");
             sb.Append($" 长椅 / bench {FsmDump.PathOf(bench.transform)}（Set Respawn {(setRespawn != null ? setRespawn.Value.ToString() : "-")}{(setRespawn != null && setRespawn.Value ? " → False" : "")}）；");
-            if (setRespawn != null)
-            {
-                setRespawn.Value = false;
-            }
+            PantheonRestBench.Configure(bench);
         }
         foreach (BossSceneController c in roots.SelectMany(r => r.GetComponentsInChildren<BossSceneController>(true)))
         {
+            // 前作的连战控制器会为温泉出口填写目的地。两个字段有一个为空，碰到出口也不会发起转场。
+            // 此处在 TransitionPoint.Start 之前设好，Start 会按 targetScene 初始化资源。战场入口由 Arena 动态创建。
+            TransitionPoint exit = c.customExitPoint;
+            if (exit != null && nextBoss != null)
+            {
+                exit.targetScene = nextBoss.EntryScene;
+                exit.entryPoint = Arena.EnterGate;
+                SkipSceneMapCheck(exit) = true;
+            }
             // SetupEvent 没用上（控制器关着、Awake 还没跑）也不能让它销毁时还原束缚、自己放转场。
             RestoreField(c) = false;
             DoTransitionField(c) = false;
@@ -125,7 +132,7 @@ internal static class Hk1Spa
                 }
             }
             sb.Append($" 控制器 / controller {FsmDump.PathOf(c.transform)}（transitionPrefab {(c.transitionPrefab != null ? c.transitionPrefab.name : "-")}，"
-                + $"in {c.doTransitionIn}/{c.transitionInHoldTime:0.##}s，out {c.doTransitionOut}，exit {(c.customExitPoint != null ? c.customExitPoint.name + "→" + c.customExitPoint.targetScene : "-")}，"
+                + $"in {c.doTransitionIn}/{c.transitionInHoldTime:0.##}s，out {c.doTransitionOut}，exit {(exit != null ? $"{exit.name}→{exit.targetScene}@{exit.entryPoint}" : "-")}，"
                 + $"bosses {(c.bosses != null ? c.bosses.Length : 0)}）；");
         }
         string gates = string.Join("，", roots.SelectMany(r => r.GetComponentsInChildren<TransitionPoint>(true))

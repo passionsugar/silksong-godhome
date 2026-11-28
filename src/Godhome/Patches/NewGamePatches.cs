@@ -4,6 +4,26 @@ using TeamCherry.Localization;
 
 namespace Godhome;
 
+[HarmonyPatch(typeof(UnityEngine.UI.SaveSlotButton), "PresentSaveSlot")]
+internal static class GodhomeSaveCardPatch
+{
+    private static void Postfix(SaveStats __0, UnityEngine.UI.Text ___locationText, UnityEngine.UI.Image ___background,
+        SaveSlotBackgrounds ___saveSlots, UnityEngine.GameObject ___blackThreadOverlay)
+    {
+        if (__0 == null || __0.IsBlank || !__0.BossRushMode)
+        {
+            return;
+        }
+        ___locationText.text = L.Get("MODE_NAME");
+        var art = ___saveSlots.GetBackground(MapZone.WEAVER_SHRINE)?.BackgroundImage;
+        if (art != null)
+        {
+            ___background.sprite = art;
+            ___blackThreadOverlay.SetActive(false);
+        }
+    }
+}
+
 // [Godhome] 新建存档时可以选“织忆圣所”（神居存档）。
 //
 // 丝之歌主菜单的“选择模式”界面（Menu_Title 场景 _UIManager/UICanvas/PlaymodeMenuScreen）里，

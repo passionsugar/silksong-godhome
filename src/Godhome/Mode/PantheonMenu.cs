@@ -218,7 +218,7 @@ internal static class PantheonMenu
             {
                 text = Order[i] switch
                 {
-                    Binding.Needle => L.F("BIND_DESC_NEEDLE", bp.NeedleCap),
+                    Binding.Needle => L.F("BIND_DESC_NEEDLE", bp.NeedleMaxLevel),
                     Binding.Mask => L.F("BIND_DESC_MASK", bp.MaxMasks),
                     Binding.Tools => L.Get("BIND_DESC_TOOLS"),
                     _ => L.F("BIND_DESC_SILK", bp.MaxSilk),

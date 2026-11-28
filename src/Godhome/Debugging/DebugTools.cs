@@ -1697,7 +1697,7 @@ internal sealed partial class DebugTools : MonoBehaviour
         }
     }
 
-    private static int RawNeedle(PlayerData pd) => pd.nailUpgrades switch
+    private static int RawNeedle(int level) => level switch
     {
         0 => 5,
         1 => 9,
@@ -1788,6 +1788,8 @@ internal sealed partial class DebugTools : MonoBehaviour
         }
         PantheonRecord before = GodhomePlugin.Instance.Records.Pantheon(p.Id);
         int attemptsBefore = before.Attempts, clearsBefore = before.Clears;
+        int lobbyNeedle = PlayerData.instance.nailUpgrades;
+        int runNeedle = (bindings & Binding.Needle) != 0 ? Math.Min(lobbyNeedle, PantheonCatalog.Bindings.NeedleMaxLevel) : lobbyNeedle;
         // 临时加一个休息点：不改共用的万神殿表（Codex 审查 0.8.0：自检被停掉时撤不掉，之后正式的连战也会多一个休息点），
         // 只在自检跑着、打的是这个殿时由 ExtraRest 回答。
         int restAfter = GodhomeConfig.SelfTestPantheonRestAfter.Value;
@@ -1991,6 +1993,7 @@ internal sealed partial class DebugTools : MonoBehaviour
                     yield return Wait(2.5f);
                 }
                 PlayerData rpd = PlayerData.instance;
+                Check("休息点织针等级 / needle at rest", rpd.nailUpgrades == runNeedle, $"{rpd.nailUpgrades}/{runNeedle}");
                 Check($"休息点 / rest stop before {b.Id}", rpd.health == rpd.CurrentMaxHealth, $"{GameManager.instance.GetSceneNameString()}，hp {rpd.health}/{rpd.CurrentMaxHealth}，束缚 / bindings {Bindings.Describe(Bindings.Active)}");
                 if (hk1)
                 {
@@ -2009,7 +2012,26 @@ internal sealed partial class DebugTools : MonoBehaviour
                 // 像玩家在长椅上那样换个纹章（第一次休息点换一次），看之后每一场都还是它。
                 expectCrest ??= SwapCrestForTest();
                 expectGear = RunGear.Copy(PlayerData.instance);
-                mc.DebugLeaveRest();
+                if (GameManager.instance.GetSceneNameString() == Hk1Lobby.Spa)
+                {
+                    // 从场景里的右门触发真实碰撞。直接 DebugLeaveRest 会掩盖出口没有目的地的问题。
+                    TransitionPoint? exit = TransitionPoint.TransitionPoints.FirstOrDefault(t =>
+                        t != null && t.gameObject.scene.name == Hk1Lobby.Spa && t.name == "right1" && t.isActiveAndEnabled);
+                    Collider2D? trigger = exit != null ? exit.GetComponent<Collider2D>() : null;
+                    if (trigger == null || !trigger.enabled || !trigger.isTrigger)
+                    {
+                        abort = row.Note = "温泉右出口没有可用的碰撞触发器 / no active trigger at GG_Spa right1";
+                        break;
+                    }
+                    HeroController hero = HeroController.instance;
+                    hero.FaceRight();
+                    Vector3 center = trigger.bounds.center;
+                    Sanctum.StandAt(hero, center.x, center.y - 0.5f);
+                }
+                else
+                {
+                    mc.DebugLeaveRest();
+                }
                 yield return WaitFor(() => mc.State is LoomState.Fight or LoomState.Lobby || !Allowed(), timeout + 30f);
             }
             GameManager gm = GameManager.instance;
@@ -2022,10 +2044,12 @@ internal sealed partial class DebugTools : MonoBehaviour
                 break;
             }
             PlayerData pd = PlayerData.instance;
+            Check($"织针等级与针伤 / needle level and damage ({b.Id})", pd.nailUpgrades == runNeedle && pd.nailDamage == RawNeedle(runNeedle),
+                $"level {pd.nailUpgrades}/{runNeedle}, damage {pd.nailDamage}/{RawNeedle(runNeedle)}");
             if (i == 0)
             {
-                int raw = RawNeedle(pd);
-                bool needleOk = (bindings & Binding.Needle) == 0 ? pd.nailDamage == raw : pd.nailDamage == Bindings.NeedleDamage(raw);
+                int savedNeedle = SaveGuard.Fresh().playerData.nailUpgrades;
+                Check("快照织针等级 / saved needle level", savedNeedle == lobbyNeedle, $"{savedNeedle}/{lobbyNeedle}");
                 bool maskOk = (bindings & Binding.Mask) == 0 || pd.CurrentMaxHealth <= PantheonCatalog.Bindings.MaxMasks;
                 bool silkOk = (bindings & Binding.Silk) == 0 || pd.CurrentSilkMax <= PantheonCatalog.Bindings.MaxSilk;
                 // 0.10.5：念珠、碎片无限以后，工具束缚照样要让所有攻击工具扔不出去（三个方向都没有绑定的工具，主角也拿不到要扔的工具）。
@@ -2045,8 +2069,8 @@ internal sealed partial class DebugTools : MonoBehaviour
                 string skillNote = SkillCheck(pd, out bool skillsOk);
                 toolsOk &= skillsOk;
                 toolsNote += skillNote;
-                Check("束缚生效 / bindings in effect", Bindings.Active == bindings && needleOk && maskOk && silkOk && toolsOk && pd.health <= pd.CurrentMaxHealth,
-                    $"织针 / needle {pd.nailDamage}（原 / raw {raw}），面具 / masks {pd.health}/{pd.CurrentMaxHealth}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，Active={Bindings.Describe(Bindings.Active)}{toolsNote}");
+                Check("束缚生效 / bindings in effect", Bindings.Active == bindings && maskOk && silkOk && toolsOk && pd.health <= pd.CurrentMaxHealth,
+                    $"织针 / needle {pd.nailDamage}，面具 / masks {pd.health}/{pd.CurrentMaxHealth}，丝 / silk {pd.silk}/{pd.CurrentSilkMax}，Active={Bindings.Describe(Bindings.Active)}{toolsNote}");
             }
             else if (!rested && carried >= 0)
             {
@@ -2274,7 +2298,8 @@ internal sealed partial class DebugTools : MonoBehaviour
             {
                 ar.Return = mc.State == LoomState.Lobby && mc.LastPantheonFail == expectedFail;
             }
-            Check("束缚解开 / bindings cleared", Bindings.Active == Binding.None && mc.Run == null, Bindings.Describe(Bindings.Active));
+            Check("束缚解开 / bindings cleared", Bindings.Active == Binding.None && mc.Run == null && PlayerData.instance.nailUpgrades == lobbyNeedle,
+                $"{Bindings.Describe(Bindings.Active)}, needle {PlayerData.instance.nailUpgrades}/{lobbyNeedle}");
             if (abandoned)
             {
                 Check("作废记下来了 / failed run noted", mc.LastPantheonFail == $"{p.Id}@{abortAt}: {AbandonReason}", mc.LastPantheonFail);

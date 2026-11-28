@@ -411,17 +411,20 @@ internal static class Hk1Tour
                         Try("进门 / enter door", () => door.Interact());
                     }
                     yield return Until(() => Scene() == Hk1Lobby.Workshop && HubReady(), 60f);
-                    Check(Scene() == Hk1Lobby.Workshop && HubReady(), $"走到手办屋 / walked into the workshop: scene={Scene()} state={mc.State} ready={Lobby.Ready} busy={Hk1Hall.Busy}");
+                    Check(Scene() == Hk1Lobby.Workshop && HubReady(), $"走到手办屋 / walked into the workshop: scene={Scene()} state={mc.State} ready={Lobby.Ready} carving={Hk1Hall.Carving}");
                 }
             }
             if (Scene() == Hk1Lobby.Workshop)
             {
+                yield return Until(() => !Hk1Hall.Carving, 60f);
                 List<Hk1Hall.Slot> all = Hk1Hall.Slots.OrderBy(s => s.Statue.transform.position.y).ThenBy(s => s.Statue.transform.position.x).ToList();
                 Log("手办屋 / hall: " + Hk1Hall.Note);
-                // 0.10.7：拆开 7 对合并以后 43 尊（前作 36 尊 + 骑士雕像 + 复制的 6 尊）。
+                // 36 个原展位加 7 个复制展位，全部搬进两层展廊。
                 Check(all.Count == 43, $"雕像 / statues: {all.Count}（要 / want 43）");
                 int painted = all.Count(s => s.MainArt != null && s.MainArt.sprite != null);
                 Check(painted == all.Count, $"换成本作石像 / painted with our statues: {painted}/{all.Count}");
+                Check(all.Where(s => s.Def.Variants.Count > 1).All(s => s.AltArt != null && s.AltArt.sprite != null),
+                    "每个拉杆都有备用石像 / all lever stations have alternate artwork");
                 Log("雕像 / statues: " + string.Join("，", all.Select(s => $"{s.Name.Replace("GG_Statue_", "")}={s.Shown.Id}{(s.Def.Variants.Count > 1 ? $"({s.Def.Variants.Count})" : "")}")));
                 yield return Shot("workshop-arrive");
                 // 0.10.6 实测清单：推杆只切同一个 Boss 的形态，手办屋要再放 7 尊。量两层地面哪里平（每 1 格往下打一条射线），
@@ -462,7 +465,8 @@ internal static class Hk1Tour
                         .OrderBy(s => s.transform.position.y).ThenBy(s => s.transform.position.x)
                         .Select(s =>
                         {
-                            SpriteRenderer? plinth = s.transform.Find("Base/GG_statues_0001_plinth_02")?.GetComponent<SpriteRenderer>();
+                            Transform plinthTransform = s.transform.Find("Base/Godhome Plinth") ?? s.transform.Find("Base/GG_statues_0001_plinth_02");
+                            SpriteRenderer? plinth = plinthTransform?.GetComponent<SpriteRenderer>();
                             return $"{s.name.Replace("GG_Statue_", "")}({s.transform.position.x:0.0},{s.transform.position.y:0.0}"
                                 + $"{(plinth != null ? $" 宽 / w {plinth.bounds.size.x:0.0}" : "")}{(s.gameObject.activeInHierarchy ? "" : " off")})";
                         })));
@@ -553,6 +557,11 @@ internal static class Hk1Tour
                     yield return new WaitForSecondsRealtime(4f);
                     Check(multi.Shown.Id != before && GodhomePlugin.Instance.Records.StatueVariant.TryGetValue(multi.Def.Id, out string? recorded) && recorded == multi.Shown.Id,
                         $"拉杆换了版本 / the lever switched the version: {before} → {multi.Shown.Id}");
+                    SpriteRenderer? shown = multi.UsingAlt ? multi.AltArt : multi.MainArt;
+                    SpriteRenderer? hidden = multi.UsingAlt ? multi.MainArt : multi.AltArt;
+                    Check(shown != null && shown.enabled && shown.gameObject.activeInHierarchy && shown.sprite != null
+                        && shown.sprite == Sanctum.CarvedStatue(multi.Shown) && hidden != null && !hidden.gameObject.activeInHierarchy,
+                        $"换形后的石像可见 / switched artwork active: {multi.Shown.Id}");
                     yield return Shot("lever-" + multi.Name.Replace("GG_Statue_", ""));
                 }
 

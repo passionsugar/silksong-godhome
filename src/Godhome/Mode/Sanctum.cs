@@ -672,8 +672,6 @@ internal static class Sanctum
         bool Mine() => Current() && owner != null && root == owner;
         // 黑幕：这个任务还有效就一直挡着（看门狗不揭），超过上限才揭（Codex 审查 v0.6.0 #7）。
         LoomUI.Instance?.Cover(1f, () => Current() && (owner == null || root == owner));
-        // 这个任务自己借的动作帧包：只还自己的，过期了也不碰别的任务借的（Codex 审查 v0.6.3 #1）。
-        Tk2dArt.Lease? lease = null;
         try
         {
             if (!Prepared)
@@ -710,18 +708,7 @@ internal static class Sanctum
                 }
                 // 雕像：把每尊（每个版本）的画雕成石像，黑幕下做完（第一次进大厅要几秒，之后有缓存）。
                 // 同一个 Boss 的其他形态用游戏的 tk2d 动作帧（另一个姿势）：先借动作帧包，雕完马上还。
-                HashSet<string> groups = Tk2dGroupsNeeded();
-                lease = Tk2dArt.Begin();
-                if (groups.Count > 0)
-                {
-                    yield return Tk2dArt.Load(lease, groups, Mine);
-                }
-                if (!Mine())
-                {
-                    yield break;
-                }
-                yield return CarveStatues(lease, Mine);
-                Tk2dArt.Release(lease, "雕完石像 / statues carved");
+                yield return CarveAllRoutine(Mine);
                 if (!Mine())
                 {
                     yield break;
@@ -754,8 +741,6 @@ internal static class Sanctum
         }
         finally
         {
-            // 自己借的动作帧包一定还（重复调没关系）。
-            Tk2dArt.Release(lease, token == buildToken ? "搭建结束 / build finished" : "搭建任务过期 / build superseded");
             // 只揭自己这一次的黑幕：过期的任务（新的搭建已经开始、或者已经换了大厅实例）不碰。
             if (token == buildToken && (owner == null || root == owner))
             {
@@ -1061,89 +1046,51 @@ internal static class Sanctum
     private static bool IsSpecial(string spec) =>
         spec.StartsWith(Tk2dPrefix, StringComparison.OrdinalIgnoreCase) || spec.StartsWith(PairPrefix, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>图鉴立绘的雕刻缓存键：名字加实例编号（不同的图同名也不会混，Codex 审查 v0.6.3 #6）。缓存回标题就清，编号在一局里不变。</summary>
-    private static string SpriteKey(string kind, Sprite sp) => kind + sp.name + "#" + sp.GetInstanceID();
-
-    /// <summary>一个版本的石像候选（按优先级，键不重复）：（雕刻缓存的键，怎么取来源）。tk2d 的来源要从这次搭建借到的包里取。</summary>
+    // Cache identities must survive a game restart. Resolve a journal sprite or a tk2d atlas
+    // only when its preferred image is missing from both memory and disk.
     private static IEnumerable<(string Key, Func<StatueCarver.Source?> Make)> ArtCandidates(BossDef b, Tk2dArt.Lease? lease)
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        bool anyJournal = false;
-        foreach (string spec in b.StatueArt)
+        foreach (string spec in b.StatueArt.Concat(b.Journal))
         {
             if (spec.StartsWith(Tk2dPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 string[] p = spec.Substring(Tk2dPrefix.Length).Split('/');
-                if (p.Length == 3)
-                {
-                    string key = Tk2dPrefix + string.Join("/", p);
-                    if (seen.Add(key))
-                    {
-                        yield return (key, () => Tk2dArt.Get(lease, p[0], p[1], p[2], key));
-                    }
-                }
+                string key = Tk2dPrefix + string.Join("/", p);
+                if (p.Length == 3 && seen.Add(key))
+                    yield return (key, () => Tk2dArt.Get(lease, p[0], p[1], p[2], key));
+                continue;
             }
-            else if (spec.StartsWith(PairPrefix, StringComparison.OrdinalIgnoreCase))
+            bool pair = spec.StartsWith(PairPrefix, StringComparison.OrdinalIgnoreCase);
+            string record = pair ? spec.Substring(PairPrefix.Length) : spec;
+            string journalKey = (pair ? PairPrefix : "journal:") + record;
+            if (seen.Add(journalKey))
             {
-                Sprite? sp = JournalRecordSprite(spec.Substring(PairPrefix.Length));
-                if (sp != null)
+                yield return (journalKey, () =>
                 {
-                    string key = SpriteKey(PairPrefix, sp);
-                    if (seen.Add(key))
-                    {
-                        yield return (key, () =>
-                        {
-                            StatueCarver.Source src = StatueCarver.Source.FromSprite(key, sp);
-                            src.Pair = true;
-                            return src;
-                        });
-                    }
-                }
-            }
-            else
-            {
-                Sprite? sp = JournalRecordSprite(spec);
-                if (sp != null)
-                {
-                    anyJournal = true;
-                    string key = SpriteKey("journal:", sp);
-                    if (seen.Add(key))
-                    {
-                        yield return (key, () => StatueCarver.Source.FromSprite(key, sp));
-                    }
-                }
+                    Sprite? sprite = JournalRecordSprite(record);
+                    if (sprite == null) return null;
+                    var source = StatueCarver.Source.FromSprite(journalKey, sprite);
+                    source.Pair = pair;
+                    return source;
+                });
             }
         }
-        foreach (string name in b.Journal)
+        string displayKey = "display:" + b.NameZh + "/" + b.NameEn;
+        yield return (displayKey, () =>
         {
-            Sprite? sp = JournalRecordSprite(name);
-            if (sp != null)
-            {
-                anyJournal = true;
-                string key = SpriteKey("journal:", sp);
-                if (seen.Add(key))
-                {
-                    yield return (key, () => StatueCarver.Source.FromSprite(key, sp));
-                }
-            }
-        }
-        if (!anyJournal)
-        {
-            Sprite? sp = DisplayNameSprite(b);
-            if (sp != null)
-            {
-                string key = SpriteKey("journal:", sp);
-                if (seen.Add(key))
-                {
-                    yield return (key, () => StatueCarver.Source.FromSprite(key, sp));
-                }
-            }
-        }
+            Sprite? sprite = DisplayNameSprite(b);
+            return sprite != null ? StatueCarver.Source.FromSprite(displayKey, sprite) : null;
+        });
     }
 
     /// <summary>这个版本雕好的石像（按候选顺序第一个雕成的）；还没雕或都没雕成返回 null。</summary>
     internal static Sprite? CarvedStatue(BossDef b)
     {
+        if (StatueCarver.Count == 0)
+        {
+            return null;
+        }
         foreach ((string key, _) in ArtCandidates(b, null))
         {
             Sprite? s = StatueCarver.Get(key);
@@ -1157,10 +1104,28 @@ internal static class Sanctum
 
     /// <summary>
     /// 前作神居的手办屋（Hk1Hall）也用这些石像：借动作帧包、雕全部雕像（每个版本）、还包。
-    /// 雕好的有缓存（回标题才清），已经都雕过就很快。
+    /// 优先恢复本地石像，只为缺失的动作帧借包。
     /// </summary>
-    internal static IEnumerator CarveAllRoutine(Func<bool> alive)
+    internal static IEnumerator CarveAllRoutine(Func<bool> alive, Action<BossDef>? carved = null)
     {
+        StatueCarver.BeginSession();
+        var owners = new Dictionary<string, List<BossDef>>(StringComparer.Ordinal);
+        foreach (BossDef v in StatueCatalog.All.SelectMany(d => d.Variants))
+        {
+            foreach ((string key, _) in ArtCandidates(v, null))
+            {
+                if (StatueCarver.Get(key) != null) break;
+                if (!owners.TryGetValue(key, out var variants))
+                    owners.Add(key, variants = new List<BossDef>());
+                variants.Add(v);
+            }
+        }
+        yield return StatueCarver.Restore(owners.Keys.ToArray(), alive, key =>
+        {
+            if (carved != null)
+                foreach (BossDef v in owners[key]) carved(v);
+        });
+        if (!alive()) yield break;
         Tk2dArt.Lease? lease = Tk2dArt.Begin();
         try
         {
@@ -1173,7 +1138,7 @@ internal static class Sanctum
             {
                 yield break;
             }
-            yield return CarveStatues(lease, alive);
+            yield return CarveStatues(lease, alive, carved);
         }
         finally
         {
@@ -1209,22 +1174,40 @@ internal static class Sanctum
     /// 雕全部雕像（每个版本）：一轮里每个版本交出它下一个没试过的候选，一起雕；
     /// 没雕成的下一轮换下一个候选，直到每个版本都雕成或候选用完（Codex 审查 v0.6.3 #4）。
     /// </summary>
-    private static IEnumerator CarveStatues(Tk2dArt.Lease lease, Func<bool> alive)
+    private static IEnumerator CarveStatues(Tk2dArt.Lease lease, Func<bool> alive, Action<BossDef>? carved = null)
     {
-        StatueCarver.BeginSession();
         var tried = new HashSet<string>(StringComparer.Ordinal);
         for (int round = 0; round < 8 && alive(); round++)
         {
             var batch = new List<StatueCarver.Source>();
+            var owners = new Dictionary<string, List<BossDef>>(StringComparer.Ordinal);
+            float nextYield = Time.realtimeSinceStartup + 0.004f;
             foreach (StatueDef d in StatueCatalog.All)
             {
                 foreach (BossDef v in d.Variants)
                 {
-                    StatueCarver.Source? src = NextSource(v, lease, tried);
-                    if (src != null && !batch.Any(x => x.Key == src.Key))
+                    // Loading the first sprite collection of a bundle can also take a frame.
+                    if (carved != null && Time.realtimeSinceStartup >= nextYield)
                     {
+                        yield return null;
+                        if (!alive())
+                        {
+                            yield break;
+                        }
+                        nextYield = Time.realtimeSinceStartup + 0.004f;
+                    }
+                    StatueCarver.Source? src = NextSource(v, lease, tried);
+                    if (src == null)
+                    {
+                        continue;
+                    }
+                    if (!owners.TryGetValue(src.Key, out var bosses))
+                    {
+                        bosses = new List<BossDef>();
+                        owners.Add(src.Key, bosses);
                         batch.Add(src);
                     }
+                    bosses.Add(v);
                 }
             }
             if (batch.Count == 0)
@@ -1235,7 +1218,13 @@ internal static class Sanctum
             {
                 tried.Add(s.Key);
             }
-            yield return StatueCarver.CarveAll(batch, alive);
+            yield return StatueCarver.CarveAll(batch, alive, carved == null ? null : key =>
+            {
+                foreach (var boss in owners[key])
+                {
+                    carved(boss);
+                }
+            });
         }
         StatueCarver.EndSession();
     }
@@ -1293,12 +1282,12 @@ internal static class Sanctum
         {
             foreach (EnemyJournalRecord rec in EnemyJournalManager.GetAllEnemies())
             {
-                if (rec == null || rec.EnemySprite == null)
+                if (rec == null)
                 {
                     continue;
                 }
                 string shown = rec.DisplayName.ToString(false) ?? "";
-                if (shown.Length > 0 && (shown == b.NameZh || shown == b.NameEn || shown.Replace(" ", "") == b.NameZh.Replace(" ", "")))
+                if (shown.Length > 0 && (shown == b.NameZh || shown == b.NameEn || shown.Replace(" ", "") == b.NameZh.Replace(" ", "")) && rec.EnemySprite != null)
                 {
                     return rec.EnemySprite;
                 }

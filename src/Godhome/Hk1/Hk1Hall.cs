@@ -20,10 +20,8 @@ namespace Godhome;
 /// </summary>
 internal static class Hk1Hall
 {
-    /// <summary>
-    /// 前作手办屋下层的雕像，从左到右（试验时从场景里读出来的位置）。Godhome_ 开头的是复制出来的（Extra）。
-    /// （x 249.9 的 GG_Statue_Knight 只是摆设，没有 BossStatue，用不上。）
-    /// </summary>
+    // Keep station names stable for challenge returns and existing records. The
+    // numbers in the copied stations' names are historical, not coordinates.
     private static readonly string[] Lower =
     {
         "Gruz", "Vengefly", "Mawlek", "FalseKnight", "Hornet", "MegaMossCharger", "Flukemarm", "MantisLords", "Oblobbles",
@@ -35,21 +33,15 @@ internal static class Hk1Hall
     private static readonly string[] Upper =
     {
         "Mage_Knight", "SoulMaster", "Defender", "Godhome_U65", "WatcherKnights", "NoEyes", "Marmu", "Xero", "Markoth", "Galien", "Gorb",
-        "ElderHu", "Nailmasters", "Godhome_U155", "Paintmaster", "Sly", "HollowKnight", "Grimm", "Godhome_U202",
+        "ElderHu", "Nailmasters", "Godhome_U155", "Paintmaster", "Sly", "HollowKnight", "Grimm", "Godhome_U202", "Zote", "Radiance",
     };
 
-    /// <summary>
-    /// 复制出来的雕像（0.10.6 实测清单：推杆只切同一个 Boss 的形态，拆开 7 对合并以后前作的雕像不够）：名字、照哪尊复制、放在哪（x）。
-    /// 位置是 0.10.7 巡视量的地面（从两层地面上方往下打射线）和截图：下层灰色王子右边（x 205，平地 21–207）、装饰门柱右边（217.5，平地 213–222；
-    /// 门柱 208–212 高出一截）、装饰墙前面（226、234）；上层守卫骑士和守望骑士之间（65.2）、针师和画师之间（155.5）、格林右边（202）。
-    /// 高度按复制源的底座到地面的距离，地面照射线现找；找不到地面就不放、记警告。
-    /// </summary>
-    private static readonly (string Name, string From, float X)[] Extra =
-    {
-        ("Godhome_L205", "Gruz", 205f), ("Godhome_L217", "Gruz", 217.5f), ("Godhome_L226", "Gruz", 226f), ("Godhome_L234", "Gruz", 234f),
-        ("Godhome_U65", "Gorb", 65.2f), ("Godhome_U155", "Gorb", 155.5f), ("Godhome_U202", "Gorb", 202f),
-    };
-
+    // level470: continuous walkable galleries at y=5 and y=35, between the
+    // stair openings and the gates. Keep the end stations inside the galleries.
+    private const float FirstX = 28f;
+    private const float Spacing = 8.25f;
+    private const float FloorSeparation = 30f;
+    private const string Plinth = "GG_statues_0001_plinth_02";
     private const string Prefix = "GG_Statue_";
 
     /// <summary>一尊前作雕像现在的样子：放的是哪组 Boss、两个展示物体上各是哪个版本、现在露出来的是哪个。</summary>
@@ -83,8 +75,8 @@ internal static class Hk1Hall
     private static readonly Dictionary<int, Slot> slots = new();
     private static int token;
 
-    /// <summary>正在雕石像（黑幕挡着）。</summary>
-    internal static bool Busy { get; private set; }
+    /// <summary>手办屋内仍有石像待雕；不影响移动和挑战。</summary>
+    internal static bool Carving { get; private set; }
 
     internal static string Note { get; private set; } = "";
 
@@ -175,7 +167,7 @@ internal static class Hk1Hall
     internal static void Forget()
     {
         slots.Clear();
-        Busy = false;
+        Carving = false;
         token++;
     }
 
@@ -209,13 +201,19 @@ internal static class Hk1Hall
     {
         Forget();
         Dictionary<string, StatueDef> map = Assignment();
-        AddExtra(scene);
         GameObject[] roots = scene.GetRootGameObjects();
         OpenHidden(roots);
+        var stations = roots.SelectMany(r => r.GetComponentsInChildren<BossStatue>(true))
+            .Where(st => map.ContainsKey(st.name) || st.name == Prefix + "Gruz").ToDictionary(st => st.name);
+        BossStatue template = stations[Prefix + "Gruz"];
+        SpriteRenderer plinth = template.transform.Find("Base/" + Plinth).GetComponent<SpriteRenderer>();
+        Vector3 origin = template.transform.position;
+        ArrangeRow(Lower, origin, template, stations);
+        ArrangeRow(Upper, origin + Vector3.up * FloorSeparation, template, stations);
         GodhomeSaveData rec = GodhomePlugin.Instance.Records;
         int n = 0, levers = 0, art = 0;
         var noArt = new List<string>();
-        foreach (BossStatue st in roots.SelectMany(r => r.GetComponentsInChildren<BossStatue>(true)))
+        foreach (BossStatue st in stations.Values)
         {
             if (!map.TryGetValue(st.name, out StatueDef? def))
             {
@@ -243,15 +241,14 @@ internal static class Hk1Hall
             try
             {
                 WireStatue(slot, ref levers);
-                slot.MainArt = Dress(st.statueDisplay, "main");
-                slot.AltArt = Dress(st.statueDisplayAlt, "alt");
-                float maxW = WidthFor(st, roots);
-                foreach (SpriteRenderer? shown in new[] { slot.MainArt, slot.AltArt })
+                SpriteRenderer pedestal = StandardPlinth(st, plinth);
+                Bounds bounds = pedestal.sprite.bounds;
+                Vector3 top = pedestal.transform.TransformPoint(new Vector3(bounds.center.x, bounds.max.y, 0f));
+                top.z = pedestal.transform.position.z + 0.3f;
+                slot.MainArt = Dress(st.statueDisplay, pedestal, top);
+                if (def.Variants.Count > 1)
                 {
-                    if (shown != null && shown.GetComponent<Hk1StatueFit>() is Hk1StatueFit f)
-                    {
-                        f.MaxWidth = maxW;
-                    }
+                    slot.AltArt = Dress(st.statueDisplayAlt, pedestal, top, slot.MainArt.sharedMaterial);
                 }
                 if (Paint(slot))
                 {
@@ -269,85 +266,76 @@ internal static class Hk1Hall
         }
         Note = $"前作手办屋 / hk1 hall: 雕像 / statues {n}，拉杆 / levers {levers}，已有石像 / carved art {art}";
         GodhomePlugin.Log.LogInfo($"[Godhome] {Note}{(noArt.Count > 0 ? "；还要雕 / to carve: " + string.Join(", ", noArt) : "")}");
-        if (noArt.Count > 0)
-        {
-            // 还有没雕的：黑幕挡着，到场后雕（雕好有缓存，下次进来就不用等）。
-            Busy = true;
-            LoomUI.Instance?.Cover(1f, () => Busy);
-        }
+        // A previous visit can end while the third lever variant is still being prepared.
+        Carving = noArt.Count > 0 || slots.Values.Any(s =>
+            s.Def.Variants.Any(v => Sanctum.CarvedStatue(v) == null));
     }
 
-    /// <summary>
-    /// 照前作的雕像复制几尊放到空地上（Extra）。复制时雕像已经 Awake 过（回程门名字接过雕像名），复制品自己的 Awake 又接一次：
-    /// 改回 door_dreamReturnGG_ + 新名字（ReturnTo、死后复活点都按这个名字找）。镜头锁的高度在 Awake 里按位置算，同一层不用改。
-    /// </summary>
-    private static void AddExtra(Scene scene)
+    private static void ArrangeRow(string[] row, Vector3 origin, BossStatue template, Dictionary<string, BossStatue> stations)
     {
-        var made = new List<string>();
-        foreach ((string name, string from, float x) in Extra)
+        for (int i = 0; i < row.Length; i++)
         {
-            GameObject? src = scene.GetRootGameObjects().FirstOrDefault(r => r.name == Prefix + from);
-            if (src == null || scene.GetRootGameObjects().Any(r => r.name == Prefix + name))
+            string name = Prefix + row[i];
+            var position = new Vector3(FirstX + i * Spacing, origin.y, origin.z);
+            if (!stations.TryGetValue(name, out BossStatue st))
             {
-                if (src == null)
+                if (!row[i].StartsWith("Godhome_", StringComparison.Ordinal))
                 {
-                    GodhomePlugin.Log.LogWarning($"[Godhome] 前作手办屋：复制源不在 / hk1 hall: copy source missing {Prefix + from}");
+                    GodhomePlugin.Log.LogWarning($"[Godhome] Missing workshop station {name}");
+                    continue;
                 }
-                continue;
+                st = Object.Instantiate(template, position, Quaternion.identity);
+                if (st.gameObject.scene != template.gameObject.scene)
+                {
+                    SceneManager.MoveGameObjectToScene(st.gameObject, template.gameObject.scene);
+                }
+                st.name = name;
+                st.dreamReturnGate.name = Hk1Lobby.ReturnGatePrefix + name;
+                stations.Add(name, st);
             }
-            Vector3 sp = src.transform.position;
-            float? srcGround = Ground(sp.x, sp.y + 3f);
-            float? ground = Ground(x, sp.y + 3f);
-            if (srcGround == null || (ground != null && Mathf.Abs(ground.Value - srcGround.Value) > 1.5f))
+            // Zote lived under a scaled, gated scenery group. Move the whole
+            // station, including its Inspect trigger, lever and return gate.
+            st.transform.SetParent(null, false);
+            st.transform.SetPositionAndRotation(position, Quaternion.identity);
+            st.transform.localScale = Vector3.one;
+            st.gameObject.SetActive(true);
+            if (st.cameraLock != null)
             {
-                GodhomePlugin.Log.LogWarning($"[Godhome] 前作手办屋：{name} 那里的地面和复制源不一样高，不放 / hk1 hall: floor for {name} at x {x:0.0} differs（复制源地面 / source floor {srcGround?.ToString("0.0") ?? "-"}，这里 / here {ground?.ToString("0.0") ?? "-"}）");
-                continue;
+                st.cameraLock.cameraYMin = st.cameraLock.cameraYMax = position.y + st.inspectCameraHeight;
             }
-            if (ground == null)
-            {
-                // 第一次加载手办屋时右边那段的地形碰撞还没建好（0.10.7 巡视：第一次 L205、L217 打不到地面，之后再进就有，量出来都是 5.0），
-                // 按复制源的地面高度放（Extra 的位置都是量过和复制源同一层平地的）。
-                GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：{name} 那里暂时打不到地面，按复制源的地面 {srcGround.Value:0.0} 放 / hk1 hall: no floor hit for {name} yet; using the source floor");
-                ground = srcGround;
-            }
-            GameObject copy = Object.Instantiate(src);
-            SceneManager.MoveGameObjectToScene(copy, scene);
-            copy.name = Prefix + name;
-            copy.transform.position = new Vector3(x, ground.Value + (sp.y - srcGround.Value), sp.z);
-            BossStatue? st = copy.GetComponent<BossStatue>();
-            if (st != null && st.dreamReturnGate != null)
-            {
-                st.dreamReturnGate.name = Hk1Lobby.ReturnGatePrefix + copy.name;
-            }
-            made.Add($"{name}({x:0.0},{copy.transform.position.y:0.0})");
-        }
-        if (made.Count > 0)
-        {
-            GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：复制的雕像 / hk1 hall: copied statues {string.Join("，", made)}");
         }
     }
 
-    /// <summary>x 处从 fromY 往下 12 格内的地面高度（地形层）；起点在地形里或者找不到返回 null。</summary>
-    private static float? Ground(float x, float fromY)
+    private static SpriteRenderer StandardPlinth(BossStatue statue, SpriteRenderer template)
     {
-        var o = new Vector2(x, fromY);
-        if (Physics2D.OverlapPoint(o, 1 << 8) != null)
+        Transform holder = statue.transform.Find("Base");
+        if (template.transform.parent == holder)
         {
-            return null;
+            return template;
         }
-        RaycastHit2D g = Physics2D.Raycast(o, Vector2.down, 12f, 1 << 8);
-        return g.collider != null ? g.point.y : null;
-    }
-
-    /// <summary>石像的宽度上限：同一层（高度差 3 以内）最近的邻居雕像离多远，减掉 2（两边各留 1），至少 5，最多 12。</summary>
-    private static float WidthFor(BossStatue st, GameObject[] roots)
-    {
-        Vector3 p = st.transform.position;
-        float gap = roots.SelectMany(r => r.GetComponentsInChildren<BossStatue>(true))
-            .Where(o => o != st && Mathf.Abs(o.transform.position.y - p.y) < 3f)
-            .Select(o => Mathf.Abs(o.transform.position.x - p.x))
-            .DefaultIfEmpty(14f).Min();
-        return Mathf.Clamp(gap - 2f, 5f, 12f);
+        // Some bases have multiple plinths of the same name, others a stretched
+        // plinth or only a placeholder. Keep reward plaques and effects intact.
+        foreach (Transform child in holder)
+        {
+            if (child.name.StartsWith(Plinth, StringComparison.Ordinal))
+            {
+                foreach (SpriteRenderer old in child.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    old.enabled = false;
+                }
+            }
+        }
+        SpriteRenderer plinth = Object.Instantiate(template, holder, false);
+        plinth.name = "Godhome Plinth";
+        Transform plaque = holder.Find("Plaque");
+        if (plaque != null)
+        {
+            Transform regular = template.transform.parent.Find("Plaque");
+            plaque.localPosition = regular.localPosition;
+            plaque.localScale = regular.localScale;
+            plaque.gameObject.SetActive(true);
+        }
+        return plinth;
     }
 
     /// <summary>
@@ -521,78 +509,29 @@ internal static class Hk1Hall
         };
     }
 
-    /// <summary>
-    /// 展示物体（statueDisplay / statueDisplayAlt）里前作的画藏起来，在最大的那张图的物体下面挂一张我们的石像
-    /// （跟着前作的沉下升起动画走）。返回挂上的渲染器（石像还没雕好时是空图）。
-    /// </summary>
-    private static SpriteRenderer? Dress(GameObject? display, string label)
+    // The alternate display can be an empty animated GameObject (e.g. Gruz).
+    // Both forms need their own renderer even when HK1 supplied no sprite.
+    private static SpriteRenderer Dress(GameObject display, SpriteRenderer plinth, Vector3 top, Material? mainMaterial = null)
     {
-        if (display == null)
-        {
-            return null;
-        }
-        List<SpriteRenderer> srs = display.GetComponentsInChildren<SpriteRenderer>(true).Where(r => r != null && r.sprite != null && r.name != "Godhome Statue").ToList();
-        if (srs.Count == 0)
-        {
-            return null;
-        }
-        SpriteRenderer big = srs.OrderByDescending(r => WorldBox(r).size.x * WorldBox(r).size.y).First();
-        // 所有图合起来的范围（Codex 审计 0.10.3 F09：以前 big 来自排序后的序列，Skip(1) 却跳过原列表的第一张，
-        // 第一张不是最大的时候它的范围漏掉了）。big 再包一次无害。
-        Bounds box = WorldBox(big);
-        foreach (SpriteRenderer r in srs)
-        {
-            box.Encapsulate(WorldBox(r));
-        }
-        if (srs[0] != big)
-        {
-            // 记下以前的算法会得到什么，看哪尊受影响（审计说没有实际资产证据，这里留证据）。
-            Bounds old = WorldBox(big);
-            foreach (SpriteRenderer r in srs.Skip(1))
-            {
-                old.Encapsulate(WorldBox(r));
-            }
-            bool same = (old.min - box.min).sqrMagnitude < 1e-6f && (old.max - box.max).sqrMagnitude < 1e-6f;
-            GodhomePlugin.Log.LogInfo($"[Godhome] 前作雕像 {label}：最大的图不是第一张（{big.name}，第一张 {srs[0].name}），范围 / bounds {box.min.x:0.00},{box.min.y:0.00} .. {box.max.x:0.00},{box.max.y:0.00}"
-                + (same ? "，和以前一样 / same as before" : $"，以前 / was {old.min.x:0.00},{old.min.y:0.00} .. {old.max.x:0.00},{old.max.y:0.00}"));
-        }
-        foreach (SpriteRenderer r in srs)
+        SpriteRenderer[] original = display.GetComponentsInChildren<SpriteRenderer>(true);
+        foreach (SpriteRenderer r in original)
         {
             r.enabled = false;
         }
         var go = new GameObject("Godhome Statue");
-        go.transform.SetParent(big.transform, false);
+        go.transform.SetParent(display.transform, false);
         SpriteRenderer mine = go.AddComponent<SpriteRenderer>();
-        // 前作雕像用会受光的材质（实测 Sprites-Diffuse，靠光柱和点光照亮）；石像也用它（深色石料就是按这个调的）。
-        // 有的雕像上 SpriteFadeMaterial 会在 Start 里把子精灵的材质换掉：贴上以后由 Hk1StatueFit 盯着换回来。
-        Material? lit = srs.Select(r => r.sharedMaterial).FirstOrDefault(m => m != null && m.shader != null && m.shader.name.Contains("Diffuse"));
-        mine.sharedMaterial = lit != null ? lit : big.sharedMaterial;
-        mine.sortingLayerID = big.sortingLayerID;
-        mine.sortingOrder = big.sortingOrder;
-        mine.color = Color.white;
+        Material? lit = original.Select(r => r.sharedMaterial)
+            .FirstOrDefault(m => m != null && m.shader != null && m.shader.name.Contains("Diffuse"));
+        mine.sharedMaterial = lit != null ? lit : mainMaterial != null ? mainMaterial : plinth.sharedMaterial;
+        mine.sortingLayerID = plinth.sortingLayerID;
+        mine.sortingOrder = plinth.sortingOrder;
         var fit = go.AddComponent<Hk1StatueFit>();
         fit.Mat = mine.sharedMaterial;
-        // 底边中点记在父物体（前作那张画）的本地坐标里：前作的沉下升起动画移动的是父物体，
-        // 以前记世界坐标，在雕像沉在地下时换图（拉杆换版本时两个展示物体都重新摆）就会偏出底座，下次换图又瞬移回来（实测清单第 6 条）。
-        fit.LocalBottom = big.transform.InverseTransformPoint(new Vector3(box.center.x, box.min.y, big.transform.position.z));
-        // 大小按 Boss 真实大小（雕出来的石像就是 Boss 的世界尺寸），所有雕像同一个比例；太高、太宽的压下来（实测清单第 5 条）。
-        // 宽度上限 Prepare 里按同一层左右邻居的间距再定。
+        fit.LocalBottom = display.transform.InverseTransformPoint(top);
         fit.MaxHeight = StatueMaxHeight;
-        fit.MaxWidth = 8f;
+        fit.MaxWidth = Spacing - 2f;
         return mine;
-    }
-
-    /// <summary>精灵在世界里的包围盒（物体关着也能算：按精灵自己的包围盒和变换算，不用 Renderer.bounds）。</summary>
-    private static Bounds WorldBox(SpriteRenderer r)
-    {
-        Bounds b = r.sprite.bounds;
-        Transform t = r.transform;
-        Vector3 a = t.TransformPoint(b.min), c = t.TransformPoint(b.max);
-        var w = new Bounds(a, Vector3.zero);
-        w.Encapsulate(c);
-        w.Encapsulate(t.TransformPoint(new Vector3(b.min.x, b.max.y, 0f)));
-        w.Encapsulate(t.TransformPoint(new Vector3(b.max.x, b.min.y, 0f)));
-        return w;
     }
 
     /// <summary>两个展示物体按各自的版本换上石像。全都有了返回 true。</summary>
@@ -610,11 +549,15 @@ internal static class Hk1Hall
     {
         if (r == null)
         {
-            return true;
+            return false;
         }
         Sprite? sp = Sanctum.CarvedStatue(b);
-        r.sprite = sp;
-        r.GetComponent<Hk1StatueFit>()?.Apply();
+        Sprite? display = sp ?? Sanctum.JournalSprite(b);
+        if (r.sprite != display)
+        {
+            r.sprite = display;
+            r.GetComponent<Hk1StatueFit>()?.Apply();
+        }
         return sp != null;
     }
 
@@ -651,11 +594,10 @@ internal static class Hk1Hall
             return;
         }
         int t = token;
-        if (Busy)
+        if (Carving)
         {
             host.StartCoroutine(CarveRoutine(t));
         }
-        host.StartCoroutine(InspectWatch(t));
         host.StartCoroutine(GlowAfterStart(t));
     }
 
@@ -683,14 +625,19 @@ internal static class Hk1Hall
     {
         try
         {
-            yield return Sanctum.CarveAllRoutine(() => Alive(t));
+            yield return null;
             if (!Alive(t))
             {
                 yield break;
             }
-            int ok = slots.Values.Count(Paint);
-            GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：石像雕好 / hk1 hall: statues carved, {ok}/{slots.Count} 尊有画 / with art");
-            foreach (Slot s in slots.Values.Where(s => !Paint(s)))
+            yield return Sanctum.CarveAllRoutine(() => Alive(t), RefreshCarved);
+            if (!Alive(t))
+            {
+                yield break;
+            }
+            var missing = slots.Values.Where(s => !Paint(s)).ToList();
+            GodhomePlugin.Log.LogInfo($"[Godhome] 前作手办屋：石像雕好 / hk1 hall: statues carved, {slots.Count - missing.Count}/{slots.Count}");
+            foreach (Slot s in missing)
             {
                 GodhomePlugin.Log.LogWarning($"[Godhome]   前作雕像没有石像 / hk1 statue without carved art: {s.Name}（{s.Def.Id}）");
             }
@@ -699,42 +646,30 @@ internal static class Hk1Hall
         {
             if (t == token)
             {
-                Busy = false;
-                LoomUI.Instance?.FadeCover(0f, 0.8f);
+                Carving = false;
             }
         }
     }
 
-    /// <summary>
-    /// 从雕像回来时前作的“Return from boss”FSM 先关掉雕像的交互（Inspect），等前作的转场特效发“DREAM WAKE”再打开；
-    /// 丝之歌里那个事件可能不来：回来 6 秒后还关着就打开。
-    /// </summary>
-    private static IEnumerator InspectWatch(int t)
+    private static void RefreshCarved(BossDef boss)
     {
-        yield return new WaitForSecondsRealtime(6f);
-        if (!Alive(t))
-        {
-            yield break;
-        }
-        int fixedN = 0;
         foreach (Slot s in slots.Values)
         {
-            Transform? ins = s.Statue != null ? s.Statue.transform.Find("Inspect") : null;
-            if (ins != null && !ins.gameObject.activeSelf)
+            if (s.Def.Variants[s.Main] == boss)
             {
-                ins.gameObject.SetActive(true);
-                fixedN++;
+                Set(s.MainArt, boss);
+            }
+            if (s.AltArt != null && s.Def.Variants[s.Alt] == boss)
+            {
+                Set(s.AltArt, boss);
             }
         }
-        if (fixedN > 0)
-        {
-            GodhomePlugin.Log.LogInfo($"[Godhome] 前作雕像的交互没有自己打开，补开了 {fixedN} 个 / reopened {fixedN} statue inspect region(s)");
-        }
     }
+
 }
 
 /// <summary>
-/// 石像摆放：底边中点对在前作雕像画的底边中点（记在父物体的本地坐标里，跟着前作的沉下升起动画走）；
+/// 石像摆放：底边中点对齐底座顶面，锚点使用各自展示物体的本地坐标；
 /// 大小是 Boss 的真实大小（所有雕像同一个比例），超过高度、宽度上限的压下来。
 /// </summary>
 internal sealed class Hk1StatueFit : MonoBehaviour
